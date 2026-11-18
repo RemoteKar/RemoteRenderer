@@ -5,7 +5,7 @@
 	"name": "RemoteRenderer",
 	"description": "Item-display models (BetterModel bones and meshes, objmc) are baked once and drawn with GPU instancing. Resource-pack rigs add skinned joints, real textures, hair / skirt / cape physics and client animation clips; a server pack's own item shader keeps working (run instanced). Client side only.",
 	"authors": [
-		"GCB"
+		"Repina"
 	],
 	"contact": {
 		"homepage": "https://github.com/RemoteKar/RemoteRenderer",
