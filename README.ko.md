@@ -16,6 +16,10 @@
   - RemoteRenderer가 그리는 아이템 디스플레이는 바닐라의 엔티티별 처리(이름표, 스코어보드, 조명 조회, 자세 스택 복사)를 건너뜁니다.
   - 모델이 화면 밖인 디스플레이는 렌더 상태를 추출하기 전에 뺍니다.
   - 이름이 있거나 발광하거나 그림자가 있는 디스플레이는 계속 바닐라 경로로 갑니다.
+- **뼈 패킷 묶어 받기**(`bulkData`, 기본 켜짐, Fabric API 필요):
+  - ModelEngine(R4.1.0 이상)과 BetterModel(3.3.0 이상)에 이미 있는 클라이언트 모드용 채널 `modelengine:bulk_data`를 등록합니다.
+  - 그러면 그 서버들이 뼈마다 보내던 엔티티 데이터 패킷을 모델마다 틱당 패킷 하나로 묶어 보냅니다. 서버 트래픽과 패킷 처리가 줄고, 서버에 설치할 것은 없습니다.
+  - GCB 패치판 ModelEngine의 `gcb:bulk_data`는 GCB 모드가 그대로 받습니다(두 채널이 다 있으면 그 ModelEngine이 GCB 채널을 고릅니다). MEG 클라 모드가 깔려 있으면 채널을 그 모드에 맡깁니다.
 - **기준:** BetterModel 최신(3.6.0). 서버는 아무것도 바꾸지 않아도 되고, 모드가 없는 플레이어는 지금처럼 바닐라로 봅니다.
 
 BetterModel(본/메쉬 본)과 objmc로 만든 모델은 결국 **아이템 디스플레이 엔티티**로 그려집니다.
@@ -191,6 +195,19 @@ OpenGL, Fabric API만 (`build/bench-opengl-fabricapi.md`):
 
 같은 큐브 본 디스플레이 약 2600개를 등지고 있을 때: 0.2.1은 820 FPS, 빠른 엔티티 처리(0.3.0)는 1820 FPS입니다. 추출 전에 빠지기 때문입니다.
 
+`bulkData`의 서버 트래픽 (클라이언트 하나가 받은 양 = 서버가 그 플레이어에게 보낸 양, `tests/bulk_test.py`):
+
+| 장면 | 일반 패킷 | `bulkData` |
+|---|---:|---:|
+| BetterModel 리자몽 8마리(각 뼈 92개) 달리기, BetterModel 3.6.0 | 936 KB/s, 초당 31,072개 | 330 KB/s, 초당 369개 |
+| 같은 장면 + 계속 회전 | 1,125 KB/s, 초당 약 46,000개 | 400 KB/s, 초당 약 12,000개 |
+| ModelEngine 플레이어 모델 8개 회전, GCB 패치판 R4.1.1 | 29.3 KB/s, 초당 1,230개 | 16.5 KB/s, 초당 307개 |
+
+BetterModel은 모델 전체 회전을 엔티티 회전 패킷으로 보내서 그 부분은 남습니다.
+뼈 움직임은 두 경로가 같습니다. 디스플레이마다 프레임당 회전량이 같고, 10 FPS에서도 왔다 갔다 하는 흔들림이 늘지 않습니다.
+90° 넘게 튀는 프레임은 오히려 일반 패킷 쪽에서만 나왔습니다(부하가 걸렸을 때).
+시선을 따라 머리가 도는 ModelEngine 모델을 회전시킨 스크린샷도 모델 가장자리 16~47픽셀만 다릅니다.
+
 Vulkan + Danmo263 렌더 모드(Sodium, Sodium Extra, Iris 셰이더팩 없음, EntityCulling, MoreCulling) — 사용자 클라이언트와 같은 구성 (`build/bench-vulkan-danmo.md`):
 
 | 장면 | 바닐라 | RemoteRenderer | 배율 |
@@ -208,8 +225,8 @@ Vulkan + Danmo263 렌더 모드(Sodium, Sodium Extra, Iris 셰이더팩 없음, 
 
 ## 한계 / 아직 안 한 것
 
-- **엔티티 자체는 그대로 있습니다.** 이 모드는 클라이언트에서 *그리는* 비용만 없앱니다.
-  서버가 본마다 디스플레이 엔티티를 만들고 매 틱 변환 패킷을 보내는 비용(서버 CPU, 네트워크)은 줄지 않습니다.
+- **엔티티 자체는 그대로 있습니다.** 이 모드는 클라이언트에서 *그리는* 비용을 없애고, `bulkData`로 ModelEngine/BetterModel 서버의 변환 패킷을 줄입니다.
+  서버가 본마다 디스플레이 엔티티를 만들고 애니메이션을 계산하는 비용은 그대로입니다.
   그것까지 없애려면 서버 플러그인(BetterModel 연동)과 이 모드 사이에 전용 프로토콜이 필요합니다.
   서버가 "모델 X, 위치, 애니메이션 상태"만 보내고 본 계산과 그리기는 클라이언트가 하는 방식입니다. 모드가 없는 플레이어용 폴백도 같이 설계해야 합니다.
 - objmc: 다중 텍스처와 텍스처 간 페이드(`interpolation`), 손/GUI 표시는 처리하지 않습니다. objmc 아이템은 아이템 디스플레이일 때만 해당됩니다.
@@ -233,6 +250,7 @@ mod/resources/assets/remoterenderer/shaders/core/   mesh.vsh/fsh, objmc.vsh/fsh
 tools/testpack/   테스트 리소스팩 생성 (java-mesh로 BetterModel과 같은 메쉬 아이템, objmc 인코더, .bbmodel 생성)
 tests/run_client.py   바닐라 26.3 서버(또는 --bm: DivineMC+BetterModel) + Fabric 클라이언트로 실제 화면 테스트
 tests/bench.py        바닐라 vs RemoteRenderer A/B 벤치마크
+tests/bulk_test.py    modelengine:bulk_data vs 일반 패킷 (--bm BetterModel / --me ModelEngine, tests/meprobe-plugin)
 ```
 
 ## 빌드 / 테스트
@@ -241,7 +259,7 @@ tests/bench.py        바닐라 vs RemoteRenderer A/B 벤치마크
 - 26.3 클라이언트 jar: 난독화가 없는 버전입니다. 경로는 `mod/build.py`의 `CLIENT_JAR`, 라이브러리는 `CLIENT_LIBS`입니다.
 - `mod/lib/`의 jar (저장소에는 넣지 않았습니다. Maven Central / Fabric Maven에서 받으세요):
   - `fabric-loader-0.19.5.jar`, `sponge-mixin-0.17.4+mixin.0.8.7.jar`, `mixinextras-fabric-0.5.5.jar`
-  - `fabric-api-base-2.0.6+fcdff87f5d.jar`, `fabric-command-api-v2-3.1.2+fcdff87f5d.jar` (Fabric API 0.163.0+26.3에 들어 있는 것)
+  - `fabric-api-base-2.0.6+fcdff87f5d.jar`, `fabric-command-api-v2-3.1.2+fcdff87f5d.jar`, `fabric-networking-api-v1-6.3.10+5c1fee4d5d.jar` (Fabric API 0.163.0+26.3에 들어 있는 것)
   - `modmenu-21.0.0.jar` (컴파일에만 쓰임)
 
 ```
@@ -250,9 +268,10 @@ python tools/testpack/make_pack.py           # build/dm-testpack.zip
 python tools/testpack/make_bbmodel.py        # build/bm/meshtest.bbmodel  (--bm 테스트용)
 python tests/run_client.py [--off] [--danmo] [--vulkan] [--bm] [--iris-pack] 단계...
 python tests/bench.py [--danmo] [--vulkan] [초]
+python tests/bulk_test.py bm|me [조건 ...]   # bulkData vs 일반 패킷 (build/DmProbe.jar / build/MeProbe.jar 필요)
 ```
 
-테스트 클라이언트는 별도 게임 폴더(`build/client-game`)와 포트(25671/25672)를 써서 다른 서버와 클라이언트를 건드리지 않습니다.
+테스트 클라이언트는 별도 게임 폴더(`build/client-game`)와 포트(25671/25672/25674)를 써서 다른 서버와 클라이언트를 건드리지 않습니다.
 `tests/`의 테스트 도구는 개발자 PC의 폴더 배치(26.3 서버/클라이언트, BetterModel jar 위치)를 가정합니다.
 
 objmc 포맷: https://github.com/Godlander/objmc (MIT, `tools/third_party/objmc/LICENSE`). 이 모드의 디코더와 테스트용 인코더는 그 포맷을 따라 새로 작성했습니다.

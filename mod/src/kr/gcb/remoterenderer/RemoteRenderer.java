@@ -383,6 +383,10 @@ public final class RemoteRenderer {
         RrRenderState dm = (RrRenderState) state;
         MeshEntry entry = dm.remoterenderer$entry();
         RigManager.BoneRef rig = dm.remoterenderer$rig();
+        if (Stats.TRACE_ROTATION && dm.remoterenderer$cache() != null) {
+            // every display that comes here, drawn by RemoteRenderer or not (its pose: orientation and transformation)
+            dm.remoterenderer$cache().traceRotation(poseStack.last().pose());
+        }
         if (DUMP != null) {
             dump(state, dm, poseStack, entry);
         }
@@ -420,9 +424,9 @@ public final class RemoteRenderer {
         // as ItemDisplayRenderer.submitInner does before ItemStackRenderState.submit (rotateY(180) = negating x and z)
         halfTurn(poseStack);
         PoseStack.Pose pose = poseStack.last();
+        EntityCache cache = dm.remoterenderer$cache();
         // not with a pack's own item shader: such shaders may draw a display somewhere else than where it stands (a HUD
         // kept out of sight and moved onto the screen by item.vsh), and vanilla draws every display anyway
-        EntityCache cache = dm.remoterenderer$cache();
         if (config.cullOffscreen && customItemShader == null && !compat() && entry.objmcParts.isEmpty() && entry.translucent.isEmpty() && entry.solidQuads > 0) {
             boolean off = offscreen(pose.pose(), entry.bounds);
             if (cache != null && rig == null) {

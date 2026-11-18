@@ -19,6 +19,14 @@ public final class Stats {
     public long frameMeshCulled, frameRigCulled, lastMeshCulled, lastRigCulled;
     public long frameFastEntities, frameEarlyCulled, lastFastEntities, lastEarlyCulled;
     public long frameRigInstances, frameRigJoints, frameRigVertices, lastRigInstances, lastRigJoints, lastRigVertices;
+    // modelengine:bulk_data (game thread): payloads, bone entries applied, entries for entities this client does not have (since start)
+    public long bulkPayloads, bulkEntries, bulkMissing;
+    // the server connection: frames and bytes received (network thread, since start)
+    public static final java.util.concurrent.atomic.LongAdder NET_BYTES = new java.util.concurrent.atomic.LongAdder(), NET_FRAMES = new java.util.concurrent.atomic.LongAdder();
+    // -Dremoterenderer.traceRotation=true: how far drawn displays turn from one frame to the next (this log window)
+    public static final boolean TRACE_ROTATION = Boolean.getBoolean("remoterenderer.traceRotation");
+    public long traceSteps, traceOver10, traceOver30, traceOver90, traceReversals;
+    public double traceMaxDeg, traceSumDeg;
     private long frameResolvesAtStart, frameBakesAtStart;
     private static final int SLOW_MS = Integer.getInteger("remoterenderer.slowFrameMs", 0);
 
@@ -67,6 +75,8 @@ public final class Stats {
         if (every > 0 && now - this.lastLog >= every * 1_000_000_000L) {
             this.lastLog = now;
             RemoteRenderer.LOG.info("RR_STATS {}", this.line());
+            this.traceSteps = this.traceOver10 = this.traceOver30 = this.traceOver90 = this.traceReversals = 0;
+            this.traceMaxDeg = this.traceSumDeg = 0.0;
         }
     }
 
@@ -99,7 +109,33 @@ public final class Stats {
         this.frameEarlyCulled = 0;
     }
 
+    /** One drawn display turned by this much since the last frame (only with {@link #TRACE_ROTATION}). */
+    public void traceRotation(double deg, boolean reversed) {
+        if (reversed) {
+            this.traceReversals++;
+        }
+        this.traceSteps++;
+        this.traceSumDeg += deg;
+        this.traceMaxDeg = Math.max(this.traceMaxDeg, deg);
+        if (deg > 10.0) {
+            this.traceOver10++;
+        }
+        if (deg > 30.0) {
+            this.traceOver30++;
+        }
+        if (deg > 90.0) {
+            this.traceOver90++;
+        }
+    }
+
     public String line() {
+        return this.baseLine() + String.format(java.util.Locale.ROOT, " bulkPayloads=%d bulkEntries=%d bulkMissing=%d netFrames=%d netKB=%.1f",
+            this.bulkPayloads, this.bulkEntries, this.bulkMissing, NET_FRAMES.sum(), NET_BYTES.sum() / 1024.0)
+            + (TRACE_ROTATION ? String.format(java.util.Locale.ROOT, " rotSteps=%d rotMeanDeg=%.3f rotMaxDeg=%.2f rotOver10=%d rotOver30=%d rotOver90=%d rotReversals=%d",
+                this.traceSteps, this.traceSteps > 0 ? this.traceSumDeg / this.traceSteps : 0.0, this.traceMaxDeg, this.traceOver10, this.traceOver30, this.traceOver90, this.traceReversals) : "");
+    }
+
+    private String baseLine() {
         Minecraft mc = Minecraft.getInstance();
         return String.format(java.util.Locale.ROOT,
             "active=%s fps=%d frameMs=%.2f maxMs=%.2f instances=%d quads=%d draws=%d models=%d vram=%.1fMB baked=%d bakeMs=%.1f maxBakeMs=%.1f pending=%d evicted=%d resolves=%d cachedResolves=%d staticHits=%d unsupported=%d lateFallbacks=%d rigs=%d rigInstances=%d rigJoints=%d rigVertices=%d rigTexMB=%.1f culled=%d rigCulled=%d fast=%d earlyCulled=%d",

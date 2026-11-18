@@ -55,5 +55,7 @@
   "remoterenderer.menu.state.shaderCompat": "with the shader pack (its programs and shadows)",
   "remoterenderer.menu.fastEntities": "Fast entity path",
   "remoterenderer.menu.fastEntities.tip": "Item displays RemoteRenderer draws skip vanilla's per-entity work (name tags, light lookups, pose stack), and displays whose model is off screen are dropped before extraction. Displays with a name, glowing or a shadow still go the vanilla way. Turn off if another mod's effects on item displays stop working.",
+  "remoterenderer.menu.bulkData": "Bulk bone packets",
+  "remoterenderer.menu.bulkData.tip": "Tells ModelEngine (R4.1+) and BetterModel (3.3+) servers that this client reads their bulk channel (modelengine:bulk_data): they then send one packet per model and tick instead of one per bone, which saves the server traffic. Bones move exactly as before; positions and rotations travel as half floats. The GCB mod's own channel stays with the GCB mod. Takes effect from the next server join (after a restart if it was off when the game started).",
   "remoterenderer.menu.shaderCompat.noShadows": "On, no model shadows"
 }

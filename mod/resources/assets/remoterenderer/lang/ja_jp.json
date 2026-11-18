@@ -55,5 +55,7 @@
   "remoterenderer.menu.state.shaderCompat": "シェーダーパックと併用中(パックのプログラム・影で描画)",
   "remoterenderer.menu.fastEntities": "高速エンティティ処理",
   "remoterenderer.menu.fastEntities.tip": "RemoteRenderer が描くアイテムディスプレイはバニラのエンティティごとの処理(名札、明るさの取得、ポーズスタック)を省き、モデルが画面外のディスプレイは抽出前に除きます。名前・発光・影のあるディスプレイは引き続きバニラの経路です。他の MOD がアイテムディスプレイに与える効果が消えたらオフにしてください。",
+  "remoterenderer.menu.bulkData": "ボーンパケットをまとめて受信",
+  "remoterenderer.menu.bulkData.tip": "ModelEngine(R4.1 以降)と BetterModel(3.3 以降)のサーバーに、このクライアントがまとめ送信チャンネル(modelengine:bulk_data)を受け取れることを伝えます。サーバーはボーンごとのパケットの代わりに、モデルごとに 1 tick 1 パケットで送るので、サーバーの通信量が減ります。ボーンの動きは今までと同じで、位置と回転は半精度浮動小数で届きます。GCB MOD 独自のチャンネルは GCB MOD がそのまま受け取ります。次にサーバーへ接続したときから有効です(ゲーム起動時にオフだった場合は再起動後)。",
   "remoterenderer.menu.shaderCompat.noShadows": "オン(モデルの影なし)"
 }

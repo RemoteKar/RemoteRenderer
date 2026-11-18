@@ -55,5 +55,7 @@
   "remoterenderer.menu.state.shaderCompat": "與光影包共用(由光影包程式和陰影繪製)",
   "remoterenderer.menu.fastEntities": "快速實體處理",
   "remoterenderer.menu.fastEntities.tip": "RemoteRenderer 繪製的物品展示實體略過原版的逐實體處理(名稱標籤、光照查詢、姿態堆疊),模型在畫面外的展示實體在擷取前就被剔除。有名稱、發光或陰影的展示實體仍走原版路徑。如果其他模組對物品展示實體的效果失效,請關閉。",
+  "remoterenderer.menu.bulkData": "批次接收骨骼封包",
+  "remoterenderer.menu.bulkData.tip": "告訴 ModelEngine(R4.1 以上)和 BetterModel(3.3 以上)伺服器本用戶端可以接收其批次通道(modelengine:bulk_data):伺服器隨後每個模型每 tick 只傳一個封包,而不是每根骨骼一個,減少伺服器流量。骨骼的動作與之前完全相同,位置和旋轉以半精度浮點數傳輸。GCB 模組自己的通道仍由 GCB 模組接收。從下次連線伺服器起生效(如果啟動遊戲時是關閉的,則需重新啟動)。",
   "remoterenderer.menu.shaderCompat.noShadows": "開(模型無陰影)"
 }

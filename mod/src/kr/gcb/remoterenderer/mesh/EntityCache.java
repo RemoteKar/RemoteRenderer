@@ -40,6 +40,47 @@ public final class EntityCache {
     private @Nullable ItemModel modelOfStack;
     private int modelGeneration = -1;
 
+    // -Dremoterenderer.traceRotation: this display's drawn rotation in the last frame (render thread)
+    private static final org.joml.Quaternionf TRACE_Q = new org.joml.Quaternionf();
+    private float traceX, traceY, traceZ, traceW;
+    private boolean traceValid;
+    // the axis of the last turn bigger than half a degree (for turning back = wobble)
+    private float traceAx, traceAy, traceAz;
+    private boolean traceAxisValid;
+
+    /** Test aid: how far the drawn display turned since the last frame goes to the stats (a still camera assumed). */
+    public void traceRotation(org.joml.Matrix4fc pose) {
+        org.joml.Quaternionf q = pose.getNormalizedRotation(TRACE_Q);
+        if (this.traceValid) {
+            double dot = Math.abs((double) q.x * this.traceX + (double) q.y * this.traceY + (double) q.z * this.traceZ + (double) q.w * this.traceW);
+            double deg = Math.toDegrees(2.0 * Math.acos(Math.min(1.0, dot)));
+            boolean reversed = false;
+            if (deg > 0.5) {
+                // the turn since the last frame: conj(previous) * current, axis = its vector part (sign fixed to the short way)
+                float dw = this.traceW * q.w + this.traceX * q.x + this.traceY * q.y + this.traceZ * q.z;
+                float dx = this.traceW * q.x - this.traceX * q.w - this.traceY * q.z + this.traceZ * q.y;
+                float dy = this.traceW * q.y + this.traceX * q.z - this.traceY * q.w - this.traceZ * q.x;
+                float dz = this.traceW * q.z - this.traceX * q.y + this.traceY * q.x - this.traceZ * q.w;
+                float s = dw < 0.0F ? -1.0F : 1.0F;
+                float len = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
+                if (len > 1.0e-6F) {
+                    float ax = dx * s / len, ay = dy * s / len, az = dz * s / len;
+                    reversed = this.traceAxisValid && ax * this.traceAx + ay * this.traceAy + az * this.traceAz < -0.5F;
+                    this.traceAx = ax;
+                    this.traceAy = ay;
+                    this.traceAz = az;
+                    this.traceAxisValid = true;
+                }
+            }
+            kr.gcb.remoterenderer.RemoteRenderer.STATS.traceRotation(deg, reversed);
+        }
+        this.traceX = q.x;
+        this.traceY = q.y;
+        this.traceZ = q.z;
+        this.traceW = q.w;
+        this.traceValid = true;
+    }
+
     /** The item model the stack's item_model names, looked up again only for another stack object or after a reload. */
     public @Nullable ItemModel model(ItemStack stack, int generation) {
         if (this.modelStack != stack || this.modelGeneration != generation) {

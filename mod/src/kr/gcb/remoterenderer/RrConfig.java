@@ -44,6 +44,8 @@ public final class RrConfig {
     public boolean compatShadows = true;
     /** Item displays RemoteRenderer draws skip vanilla's per-entity work; off-screen ones are dropped before extraction. */
     public boolean fastEntities = true;
+    /** Announce modelengine:bulk_data: ModelEngine / BetterModel servers then send one packet per model instead of one per bone. */
+    public boolean bulkData = true;
     /** Rig textures larger than this (pixels per side) are halved until they fit, when loaded (0 = as they are). */
     public int rigTextureMaxSize = 2048;
     /** A rig texture no model used for this many seconds leaves the GPU (loaded again when needed). */
@@ -80,6 +82,8 @@ public final class RrConfig {
         c.compatShadows = Boolean.parseBoolean(System.getProperty("remoterenderer.compatShadows", Boolean.toString(c.compatShadows)));
         c.fastEntities = bool(p, "fastEntities", c.fastEntities);
         c.fastEntities = Boolean.parseBoolean(System.getProperty("remoterenderer.fastEntities", Boolean.toString(c.fastEntities)));
+        c.bulkData = bool(p, "bulkData", c.bulkData);
+        c.bulkData = Boolean.parseBoolean(System.getProperty("remoterenderer.bulkData", Boolean.toString(c.bulkData)));
         c.cullOffscreen = Boolean.parseBoolean(System.getProperty("remoterenderer.cullOffscreen", Boolean.toString(c.cullOffscreen)));
         c.rigPhysics = Boolean.parseBoolean(System.getProperty("remoterenderer.rigPhysics", Boolean.toString(c.rigPhysics)));
         c.rigTextureMaxSize = Math.max(0, integer(p, "rigTextureMaxSize", c.rigTextureMaxSize));
@@ -138,6 +142,9 @@ public final class RrConfig {
                 w.write("compatShadows=" + this.compatShadows + "\n");
                 w.write("# fastEntities: item displays RemoteRenderer draws skip vanilla's per-entity work, off-screen ones are dropped before extraction\n");
                 w.write("fastEntities=" + this.fastEntities + "\n");
+                w.write("# bulkData: tell ModelEngine (R4.1+) / BetterModel (3.3+) servers this client reads modelengine:bulk_data, so they send\n");
+                w.write("#   one packet per model instead of one per bone (less traffic for the server); from the next server join\n");
+                w.write("bulkData=" + this.bulkData + "\n");
                 w.write("# rigTextureMaxSize: rig textures bigger than this are scaled down when loaded (0 = keep; 2048 = a quarter of the memory of 4096, the same picture at play distance)\n");
                 w.write("rigTextureMaxSize=" + this.rigTextureMaxSize + "\n");
                 w.write("# rigTextureIdleSeconds: a rig texture unused this long leaves the GPU\n");

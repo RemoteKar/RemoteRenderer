@@ -46,6 +46,14 @@ if BM:
     PORT = int(os.environ.get('RR_BM_PORT', '25672'))
 # --tv: a copy of the TopViewDemo server (the ragdolls: Jolt physics + BetterModel player limbs, BetterModel creatures);
 # its own pack comes from the server, hooks via "tv test DmTester ..."
+# --me: DivineMC 26.3 + ModelEngine (RR_ME_JAR, default the GCB-patched R4.1.1 of SelfCharacterBattle, read only) and its
+# player model blueprints; the client gets the pack ModelEngine generates
+ME = '--me' in flags
+ME_JAR = Path(os.environ.get('RR_ME_JAR', str(GCB / 'SelfCharacterBattle/plugins/ModelEngine-R4.1.1.jar')))
+ME_SRC = GCB / 'SelfCharacterBattle/plugins/ModelEngine'
+if ME:
+    SERVER = ROOT / 'build/meserver'
+    PORT = int(os.environ.get('RR_ME_PORT', '25674'))
 TV = '--tv' in flags
 if TV:
     SERVER = ROOT / 'build/tvserver'
@@ -94,6 +102,40 @@ def prepare_bm_server():
             shutil.rmtree(SERVER / w)
 
 
+def prepare_me_server():
+    SERVER.mkdir(parents=True, exist_ok=True)
+    if not (SERVER / 'divinemc-26.3-5.jar').exists():
+        shutil.copy(DIVINEMC / 'divinemc-26.3-5.jar', SERVER)
+        for d in ('cache', 'libraries', 'versions'):
+            shutil.copytree(DIVINEMC / d, SERVER / d)
+    plugins = SERVER / 'plugins'
+    plugins.mkdir(exist_ok=True)
+    for old in plugins.glob('ModelEngine*.jar'):
+        old.unlink()
+    shutil.copy(ME_JAR, plugins / 'ModelEngine.jar')
+    me = plugins / 'ModelEngine'
+    if (me / 'resource pack').exists():
+        shutil.rmtree(me / 'resource pack')
+    (me / 'blueprints').mkdir(parents=True, exist_ok=True)
+    shutil.copy(ME_SRC / 'config.yml', me / 'config.yml')
+    for bp in os.environ.get('RR_ME_BLUEPRINTS', 'player.bbmodel').split(','):
+        src = ME_SRC / 'blueprints' / bp
+        if src.is_dir():
+            shutil.copytree(src, me / 'blueprints' / bp, dirs_exist_ok=True)
+        else:
+            shutil.copy(src, me / 'blueprints' / bp)
+    shutil.copy(ROOT / 'build/MeProbe.jar', plugins / 'MeProbe.jar')
+    (SERVER / 'eula.txt').write_text('eula=true\n', encoding='utf-8')
+    (SERVER / 'server.properties').write_text('\n'.join([
+        'online-mode=false', f'server-port={PORT}', 'level-type=minecraft\\:flat', 'generate-structures=false', 'spawn-protection=0',
+        'gamemode=spectator', 'force-gamemode=true', 'difficulty=peaceful', 'view-distance=8', 'simulation-distance=6', 'motd=RemoteRenderer ME test',
+        'enforce-secure-profile=false', 'white-list=false', 'enforce-whitelist=false', 'spawn-monsters=false', 'allow-flight=true',
+    ]) + '\n', encoding='utf-8')
+    for w in ('world', 'world_nether', 'world_the_end'):
+        if (SERVER / w).exists():
+            shutil.rmtree(SERVER / w)
+
+
 def prepare_tv_server():
     if not (SERVER / 'divinemc-26.3-5.jar').exists():
         # read-only copy of the user's TopViewDemo server (never run in its own folder)
@@ -111,6 +153,9 @@ def prepare_tv_server():
 def prepare_server():
     if BM:
         prepare_bm_server()
+        return
+    if ME:
+        prepare_me_server()
         return
     if TV:
         prepare_tv_server()
@@ -146,6 +191,8 @@ def prepare_client():
     if '--no-mod' not in flags:
         jars = [Path(os.environ['RR_MOD_JAR'])] if os.environ.get('RR_MOD_JAR') else sorted((ROOT / 'build').glob('remoterenderer-*.jar'))
         shutil.copy(jars[-1], mods)
+    for extra_mod in [Path(x) for x in os.environ.get('RR_EXTRA_MODS', '').split(',') if x]:
+        shutil.copy(extra_mod, mods)
     if '--danmo-all' in flags:
         # every mod and config of the user's Danmo263 instance, copied (the instance itself is only read)
         for j in (DANMO / 'mods').glob('*.jar'):
@@ -185,7 +232,7 @@ def prepare_client():
         shutil.copy(x, GAME / 'resourcepacks' / x.name)
     opts = (SRC_CLIENT / 'game/options.txt').read_text(encoding='utf-8')
     rep = {
-        'resourcePacks': json.dumps(['vanilla'] + ([] if TV else ['file/dm-testpack.zip']) + ['file/' + x.name for x in extra], separators=(',', ':')), 'enableVsync': 'false', 'maxFps': '260', 'inactivityFpsLimit': '"minimized"',
+        'resourcePacks': json.dumps(['vanilla'] + ([] if TV else ['file/dm-testpack.zip']) + ['file/' + x.name for x in extra], separators=(',', ':')), 'enableVsync': 'false', 'maxFps': os.environ.get('RR_MAXFPS', '260'), 'inactivityFpsLimit': '"minimized"',
         'renderDistance': '8', 'preferredGraphicsBackend': '"vulkan"' if '--vulkan' in flags else '"opengl"', 'fullscreen': 'false',
         'overrideWidth': os.environ.get('RR_W', '1280'), 'overrideHeight': os.environ.get('RR_H', '720'), 'pauseOnLostFocus': 'false',
         'hideGui': 'false',
@@ -366,7 +413,7 @@ def main():
     prepare_server()
     prepare_client()
     server_cmd = [str(JAVA), '-Xms1G', '-Xmx3G', '-jar', 'server.jar', '--nogui']
-    if BM or TV:
+    if BM or TV or ME:
         server_cmd = [str(JAVA), '-Xms1G', '-Xmx3G', '--add-modules=jdk.incubator.vector', '--enable-native-access=ALL-UNNAMED', '-Dfile.encoding=UTF-8',
                       '-Dstdout.encoding=UTF-8', '-jar', 'divinemc-26.3-5.jar', '--nogui']
     server = subprocess.Popen(server_cmd, cwd=SERVER, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
@@ -418,6 +465,24 @@ def main():
                 time.sleep(2)
             print('bettermodel pack', built.exists() and built.stat().st_size, flush=True)
             shutil.copy(built, GAME / 'resourcepacks/dm-testpack.zip')
+        if ME:
+            # ModelEngine writes its pack as a folder after start: zip it for the client once it stops growing
+            folder = SERVER / 'plugins/ModelEngine/resource pack'
+            end = time.time() + 180
+            last = None
+            while time.time() < end:
+                files = [f for f in folder.rglob('*') if f.is_file()] if folder.exists() else []
+                now = (len(files), sum(f.stat().st_size for f in files))
+                if files and now == last:
+                    break
+                last = now
+                time.sleep(3)
+            import zipfile
+            with zipfile.ZipFile(GAME / 'resourcepacks/dm-testpack.zip', 'w', zipfile.ZIP_DEFLATED) as z:
+                for f in folder.rglob('*'):
+                    if f.is_file():
+                        z.write(f, f.relative_to(folder).as_posix())
+            print('modelengine pack', last, flush=True)
         if not TV:
             send('datapack enable "file/dmtest"')
             send('time set 6000')

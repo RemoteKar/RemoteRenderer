@@ -22,6 +22,10 @@ distinct model once into a GPU buffer and draws all displays of it with one inst
   - item displays RemoteRenderer draws skip vanilla's per-entity work (name tags, scoreboard, light lookups, pose stack copies);
   - displays whose model is off screen are dropped before their render state is even extracted;
   - displays with a name, glowing or a shadow still go the vanilla way.
+- **Bulk bone packets** (`bulkData`, on by default, needs Fabric API):
+  - RemoteRenderer registers `modelengine:bulk_data`, the channel ModelEngine (R4.1.0+) and BetterModel (3.3.0+) already have for client mods;
+  - those servers then send one packet per model and tick instead of one entity data packet per bone: less traffic and encoding work for the server, nothing to install there;
+  - the GCB-patched ModelEngine's own `gcb:bulk_data` stays with the GCB mod (that ModelEngine prefers it when both are registered); with the MEG client mod installed, RemoteRenderer leaves the channel to it.
 - Settings screen (Mod Menu or `/remoterenderer menu`). English, 한국어, 日本語, 简体中文, 繁體中文.
 - Targets the latest **BetterModel (3.6.0)**. Nothing changes on the server; players without the mod see vanilla.
 
@@ -65,6 +69,7 @@ Config file `config/remoterenderer.properties`, all settings are in the settings
 | `fastEntities` | fast entity path for the displays RemoteRenderer draws (off: the vanilla entity path, for mods that change displays) |
 | `shaderCompat` | with an Iris shader pack: go through the pack's programs instead of stepping aside |
 | `compatShadows` | with `shaderCompat`: models and rigs also cast shadows in the pack's shadow pass |
+| `bulkData` | announce `modelengine:bulk_data` to ModelEngine / BetterModel servers (from the next server join) |
 | `rigTextureMaxSize` | rig textures are scaled down to this when loaded (default 2048) |
 | `rigTextureIdleSeconds` | a rig texture nobody used this long leaves the GPU |
 | `minQuads`, `evictSeconds`, `statsLogSeconds` | |
@@ -127,9 +132,21 @@ Under such packs, plain displays are not culled, because the shader may draw the
 
 The same ~2600 cube-bone displays behind the camera: 820 FPS with 0.2.1, 1820 FPS with the fast entity path (they are dropped before extraction).
 
+Server traffic with `bulkData` (what one client receives = what the server sends to that player; `tests/bulk_test.py`):
+
+| Scene | Vanilla packets | `bulkData` |
+|---|---:|---:|
+| 8 BetterModel Charizards (92 bones each) running, BetterModel 3.6.0 | 936 KB/s, 31,072 packets/s | 330 KB/s, 369 packets/s |
+| the same, turning all the time | 1,125 KB/s, ~46,000 packets/s | 400 KB/s, ~12,000 packets/s |
+| 8 ModelEngine player models turning, GCB-patched R4.1.1 | 29.3 KB/s, 1,230 packets/s | 16.5 KB/s, 307 packets/s |
+
+BetterModel sends a model's turning as entity rotation packets, which stay. The bones move the same either way: the same turn per frame and no
+extra back-and-forth for every display (also at 10 FPS), and the vanilla path even had the only >90° jumps under load. Screenshots of turning
+ModelEngine models (heads following the look) differ in 16 to 47 edge pixels.
+
 ## Limits
 
-- The entities still exist: the server's cost (entities, transform packets) is unchanged; only drawing moves to the GPU.
+- The entities still exist: only drawing moves to the GPU. `bulkData` cuts the transform packets of ModelEngine / BetterModel servers; the per-bone entities and the server's animation work stay.
 - Translucent quads go the vanilla way.
 - Physics collides at the chain tails: very fast motion can push a cape's surface between two tails into the body. The spring values are the knob.
 - A server shader that does not use vanilla's item inputs could not match (the three packs tried do).
@@ -144,7 +161,8 @@ The same ~2600 cube-bone displays behind the camera: 820 FPS with 0.2.1, 1820 FP
 ```
 python mod/build.py                       # build/remoterenderer-<version>.jar
 python tools/testpack/make_pack.py        # test resource pack
-python tests/run_client.py [--off] [--bm] [--vulkan] [--danmo-all] steps...   # real client tests
+python tests/run_client.py [--off] [--bm] [--me] [--vulkan] [--danmo-all] steps...   # real client tests
+python tests/bulk_test.py bm|me [case ...]   # bulkData against the vanilla packets (needs build/DmProbe.jar / build/MeProbe.jar)
 ```
 
 The test tools assume the developer's folder layout (26.3 server / client, BetterModel jars).

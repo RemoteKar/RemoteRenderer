@@ -91,6 +91,8 @@ public final class RrConfigScreen extends Screen {
         this.choice(right, y, w, h, "bakeThreads", List.of(1, 2, 3, 4, 6, 8), c.bakeThreads, v -> Component.literal(Integer.toString(v)),
             v -> c.bakeThreads = v);
         y += h + gap;
+        this.toggle(right, y, w, h, "bulkData", c.bulkData, v -> c.bulkData = v);
+        y += h + gap;
         this.choice(right, y, w, h, "statsLogSeconds", List.of(0, 1, 2, 5, 10, 30), c.statsLogSeconds,
             v -> v == 0 ? CommonComponents.OPTION_OFF : Component.literal(v + "s"), v -> c.statsLogSeconds = v);
         y += h + gap;

@@ -1,0 +1,14 @@
+name: MeProbe
+version: 1.0
+main: kr.gcb.meprobe.MeProbe
+api-version: '1.21'
+depend: [ModelEngine]
+description: Test-only helper for the RemoteRenderer tests (ModelEngine models on mobs from the console).
+commands:
+  meprobe:
+    description: RemoteRenderer test helper
+    usage: /meprobe spawn|anim|clear
+    permission: meprobe.use
+permissions:
+  meprobe.use:
+    default: op

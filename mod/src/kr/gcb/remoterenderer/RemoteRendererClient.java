@@ -12,6 +12,13 @@ public final class RemoteRendererClient implements ClientModInitializer {
         RemoteRenderer.config = RrConfig.load(file);
         RemoteRenderer.LOG.info("RemoteRenderer loaded (enabled={}, objmc={}, cacheResolve={}, minQuads={})", RemoteRenderer.config.enabled,
             RemoteRenderer.config.objmc, RemoteRenderer.config.cacheResolve, RemoteRenderer.config.minQuads);
+        if (FabricLoader.getInstance().isModLoaded("fabric-networking-api-v1")) {
+            try {
+                kr.gcb.remoterenderer.net.BulkData.register();
+            } catch (LinkageError e) {
+                RemoteRenderer.LOG.warn("modelengine:bulk_data not registered: {}", e.toString());
+            }
+        }
         if (FabricLoader.getInstance().isModLoaded("fabric-command-api-v2")) {
             try {
                 RrCommands.register();

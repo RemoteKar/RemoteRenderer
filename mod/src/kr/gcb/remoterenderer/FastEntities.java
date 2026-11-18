@@ -172,6 +172,10 @@ public final class FastEntities {
         s.shadowRadius = 0.0F;
         ((RrRenderState) s).remoterenderer$setFast(true);
         RemoteRenderer.STATS.frameFastEntities++;
+        if (Stats.TRACE_ROTATION && ((RrRenderState) s).remoterenderer$cache() == null && display instanceof kr.gcb.remoterenderer.duck.RrEntity holder) {
+            // test aid: displays RemoteRenderer does not draw get their per-entity record too, for the rotation trace
+            ((RrRenderState) s).remoterenderer$set(((RrRenderState) s).remoterenderer$entry(), holder.remoterenderer$cache());
+        }
         return s;
     }
 
@@ -214,7 +218,8 @@ public final class FastEntities {
             return false;
         }
         Display.RenderState renderState = s.renderState;
-        if (renderState == null || !s.hasSubState()) {
+        boolean drawn = renderState != null && s.hasSubState();
+        if (!drawn && !(Stats.TRACE_ROTATION && renderState != null)) {
             // vanilla draws nothing for it either (no name, fire, leash or shadow: the fast extract made sure)
             return true;
         }
@@ -227,6 +232,13 @@ public final class FastEntities {
         }
         // (an unturned display: the rotation by the identity quaternion changes nothing, exactly)
         pose.mulPose(renderState.transformation().get(s.interpolationProgress));
+        if (!drawn) {
+            // test aid only (traceRotation): the pose of a display that draws nothing
+            if (((RrRenderState) s).remoterenderer$cache() != null) {
+                ((RrRenderState) s).remoterenderer$cache().traceRotation(pose.pose());
+            }
+            return true;
+        }
         return RemoteRenderer.submit(s, STACK, collector, s.lightCoords);
     }
 
