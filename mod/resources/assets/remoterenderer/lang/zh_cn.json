@@ -51,6 +51,9 @@
   "remoterenderer.cmd.minquads": "RemoteRenderer: minQuads = %s",
   "remoterenderer.cmd.status": "RemoteRenderer %s%s | %s",
   "remoterenderer.menu.shaderCompat": "与光影包共用",
-  "remoterenderer.menu.shaderCompat.tip": "Iris 光影包开启时,模型和骨骼绑定交给光影包的程序(光照、阴影)绘制。仍然跳过模型解析,骨骼绑定在 CPU 上蒙皮。",
-  "remoterenderer.menu.state.shaderCompat": "与光影包共用(由光影包程序和阴影绘制)"
+  "remoterenderer.menu.shaderCompat.tip": "Iris 光影包开启时,模型和骨骼绑定交给光影包的程序(光照、阴影)绘制。仍然跳过模型解析,骨骼绑定在 CPU 上蒙皮。“模型无阴影”会将它们排除在光影包的阴影渲染之外:约快一倍,但模型不投射阴影。",
+  "remoterenderer.menu.state.shaderCompat": "与光影包共用(由光影包程序和阴影绘制)",
+  "remoterenderer.menu.fastEntities": "快速实体处理",
+  "remoterenderer.menu.fastEntities.tip": "RemoteRenderer 绘制的物品展示实体跳过原版的逐实体处理(名称标签、光照查询、姿态栈),模型在屏幕外的展示实体在提取前就被剔除。有名称、发光或阴影的展示实体仍走原版路径。如果其他模组对物品展示实体的效果失效,请关闭。",
+  "remoterenderer.menu.shaderCompat.noShadows": "开(模型无阴影)"
 }

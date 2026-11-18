@@ -51,10 +51,17 @@ public final class RrConfigScreen extends Screen {
         y += h + gap;
         this.toggle(left, y, w, h, "cullOffscreen", c.cullOffscreen, v -> c.cullOffscreen = v);
         y += h + gap;
-        this.toggle(left, y, w, h, "shaderCompat", c.shaderCompat, v -> {
-            c.shaderCompat = v;
-            this.dirtyMeshes = true;
-        });
+        this.toggle(left, y, w, h, "fastEntities", c.fastEntities, v -> c.fastEntities = v);
+        y += h + gap;
+        // off / on / on without model shadows
+        this.choice(left, y, w, h, "shaderCompat", List.of(0, 1, 2), !c.shaderCompat ? 0 : c.compatShadows ? 1 : 2,
+            v -> v == 0 ? CommonComponents.OPTION_OFF : v == 1 ? CommonComponents.OPTION_ON : Component.translatable("remoterenderer.menu.shaderCompat.noShadows"), v -> {
+                if (c.shaderCompat != (v != 0)) {
+                    this.dirtyMeshes = true;
+                }
+                c.shaderCompat = v != 0;
+                c.compatShadows = v != 2;
+            });
         y += h + gap;
         this.toggle(left, y, w, h, "adaptCustomItemShaders", c.adaptCustomItemShaders, v -> {
             c.adaptCustomItemShaders = v;
@@ -63,9 +70,6 @@ public final class RrConfigScreen extends Screen {
         y += h + gap;
         this.choice(left, y, w, h, "hideWhileBakingQuads", List.of(0, 256, 512, 1024, 4096), c.hideWhileBakingQuads,
             v -> v == 0 ? CommonComponents.OPTION_OFF : Component.literal(v + "+"), v -> c.hideWhileBakingQuads = v);
-        y += h + gap;
-        this.choice(left, y, w, h, "bakeThreads", List.of(1, 2, 3, 4, 6, 8), c.bakeThreads, v -> Component.literal(Integer.toString(v)),
-            v -> c.bakeThreads = v);
 
         // right: rigs
         y = y0;
@@ -84,16 +88,20 @@ public final class RrConfigScreen extends Screen {
         this.choice(right, y, w, h, "rigTextureIdleSeconds", List.of(10, 30, 60, 120, 300), c.rigTextureIdleSeconds,
             v -> Component.literal(v + "s"), v -> c.rigTextureIdleSeconds = v);
         y += h + gap;
+        this.choice(right, y, w, h, "bakeThreads", List.of(1, 2, 3, 4, 6, 8), c.bakeThreads, v -> Component.literal(Integer.toString(v)),
+            v -> c.bakeThreads = v);
+        y += h + gap;
         this.choice(right, y, w, h, "statsLogSeconds", List.of(0, 1, 2, 5, 10, 30), c.statsLogSeconds,
             v -> v == 0 ? CommonComponents.OPTION_OFF : Component.literal(v + "s"), v -> c.statsLogSeconds = v);
         y += h + gap;
+        // two buttons in one row
+        int half = (w - 4) / 2;
         this.addRenderableWidget(Button.builder(Component.translatable("remoterenderer.menu.clear"), b -> MeshCache.requestClear())
-            .bounds(right, y, w, h).tooltip(Tooltip.create(Component.translatable("remoterenderer.menu.clear.tip"))).build());
-        y += h + gap;
+            .bounds(right, y, half, h).tooltip(Tooltip.create(Component.translatable("remoterenderer.menu.clear.tip"))).build());
         this.addRenderableWidget(Button.builder(Component.translatable("remoterenderer.menu.reload"), b -> {
             this.save();
             Minecraft.getInstance().reloadResourcePacks();
-        }).bounds(right, y, w, h).tooltip(Tooltip.create(Component.translatable("remoterenderer.menu.reload.tip"))).build());
+        }).bounds(right + w - half, y, half, h).tooltip(Tooltip.create(Component.translatable("remoterenderer.menu.reload.tip"))).build());
 
         this.addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> this.onClose()).bounds(this.width / 2 - 100, this.height - (this.compact ? 24 : 28), 200, 20).build());
     }

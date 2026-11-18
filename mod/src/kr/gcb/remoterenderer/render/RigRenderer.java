@@ -664,6 +664,9 @@ public final class RigRenderer implements FeatureRenderer<RigSubmit> {
 
     /** Poses the instance once per pass, then writes the parts of this render type, skinned. */
     private void skin(Instance inst, RenderType type, com.mojang.blaze3d.vertex.VertexConsumer out) {
+        if (RemoteRenderer.skipShadow()) {
+            return;
+        }
         long now = System.nanoTime();
         RigGeometry g = inst.def.boneGeometry() ? inst.rig.boneGeometry(inst.entries, now) : inst.rig.meshGeometry();
         if (g == null || g.isClosed()) {

@@ -12,6 +12,7 @@ public abstract class GameRendererMixin {
     @Inject(method = "extract(Lnet/minecraft/client/DeltaTracker;Z)V", at = @At("HEAD"))
     private void remoterenderer$extract(CallbackInfo ci) {
         RemoteRenderer.refreshIris();
+        kr.gcb.remoterenderer.FastEntities.beginFrame();
     }
 
     @Inject(method = "render()V", at = @At("HEAD"))

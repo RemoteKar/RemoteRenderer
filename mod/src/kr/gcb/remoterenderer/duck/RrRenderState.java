@@ -26,5 +26,10 @@ public interface RrRenderState {
 
     boolean remoterenderer$rigPhysicsOff();
 
+    /** Extracted by the fast entity path (FastEntities): submitted by it too. */
+    boolean remoterenderer$fast();
+
+    void remoterenderer$setFast(boolean fast);
+
     void remoterenderer$setRig(RigManager.@Nullable BoneRef bone, @Nullable Object instance, int tint, @Nullable String clip, boolean physicsOff);
 }

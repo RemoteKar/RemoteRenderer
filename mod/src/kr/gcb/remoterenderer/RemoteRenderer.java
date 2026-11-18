@@ -75,6 +75,7 @@ public final class RemoteRenderer {
     private static boolean irisLookedUp;
     private static @Nullable Object irisApi;
     private static @Nullable Method irisInUse;
+    private static @Nullable Method irisShadowPass;
     private static long irisCheckedAt;
     private static boolean irisShaders;
 
@@ -99,6 +100,18 @@ public final class RemoteRenderer {
      */
     public static boolean compat() {
         return config.shaderCompat && irisShaderPackInUse();
+    }
+
+    /** Shader-pack mode with compatShadows off, while Iris renders its shadow map: models and rigs are left out of it. */
+    public static boolean skipShadow() {
+        if (config.compatShadows || irisApi == null || irisShadowPass == null) {
+            return false;
+        }
+        try {
+            return (Boolean) irisShadowPass.invoke(irisApi);
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            return false;
+        }
     }
 
     /** LightCoordsUtil.lightCoordsWithEmission: block and sky light raised to the quad's own emission. */
@@ -213,6 +226,7 @@ public final class RemoteRenderer {
                 Class<?> api = Class.forName("net.irisshaders.iris.api.v0.IrisApi");
                 irisApi = api.getMethod("getInstance").invoke(null);
                 irisInUse = api.getMethod("isShaderPackInUse");
+                irisShadowPass = api.getMethod("isRenderingShadowPass");
             } catch (ReflectiveOperationException | LinkageError e) {
                 irisApi = null;
             }
@@ -256,6 +270,7 @@ public final class RemoteRenderer {
         }
         EntityCache cache = holder.remoterenderer$cache();
         cache.entity = entity;
+        cache.cullReach = -1.0F;
         if (config.rigs) {
             RigManager.BoneRef bone = RigManager.boneOf(stack);
             if (bone != null && bone.rig().state() != RigManager.State.FAILED) {
@@ -407,13 +422,22 @@ public final class RemoteRenderer {
         PoseStack.Pose pose = poseStack.last();
         // not with a pack's own item shader: such shaders may draw a display somewhere else than where it stands (a HUD
         // kept out of sight and moved onto the screen by item.vsh), and vanilla draws every display anyway
-        if (config.cullOffscreen && customItemShader == null && !compat() && entry.objmcParts.isEmpty() && entry.translucent.isEmpty() && entry.solidQuads > 0
-            && offscreen(pose.pose(), entry.bounds)) {
-            // vanilla draws display entities even off screen (Display.noCulling); the box of the baked model is outside the view
-            STATS.frameMeshCulled++;
-            return true;
-        }
         EntityCache cache = dm.remoterenderer$cache();
+        if (config.cullOffscreen && customItemShader == null && !compat() && entry.objmcParts.isEmpty() && entry.translucent.isEmpty() && entry.solidQuads > 0) {
+            boolean off = offscreen(pose.pose(), entry.bounds);
+            if (cache != null && rig == null) {
+                // for the fast entity path: how far from the entity this model reaches (any turn of it stays inside)
+                var cam = Minecraft.getInstance().gameRenderer.mainCamera().position();
+                double ox = CULL_CENTER.x - (state.x - cam.x), oy = CULL_CENTER.y - (state.y - cam.y), oz = CULL_CENTER.z - (state.z - cam.z);
+                cache.cullReach = (float) Math.sqrt(ox * ox + oy * oy + oz * oz) + CULL_RADIUS;
+                cache.cullRenderState = state.renderState;
+            }
+            if (off) {
+                // vanilla draws display entities even off screen (Display.noCulling); the sphere of the baked model is outside the view
+                STATS.frameMeshCulled++;
+                return true;
+            }
+        }
         if (entry.hasGpuWork()) {
             int[] objmcTints = cache != null ? cache.objmcTints(entry) : EntityCache.NO_TINTS;
             target.solid.submit(MeshSubmit.obtain(entry, pose.pose(), pose.normal(), lightCoords, OverlayTexture.NO_OVERLAY, objmcTints));
@@ -436,6 +460,10 @@ public final class RemoteRenderer {
      */
     private static boolean submitCompat(RrRenderState dm, PoseStack poseStack, SubmitNodeCollector collector, int lightCoords, @Nullable MeshEntry entry,
                                         RigManager.@Nullable BoneRef rig) {
+        if (skipShadow()) {
+            // shadow pass, model shadows off: nothing (the vanilla body is not run either)
+            return entry != null || rig != null;
+        }
         if (rig != null && dm.remoterenderer$rigInstance() != null && (!rig.rig().def.boneGeometry() || entry != null && entry.cpuVertices() != null)) {
             if (kr.gcb.remoterenderer.render.RigRenderer.compatSubmit(rig, dm.remoterenderer$rigInstance(), poseStack.last().pose(), lightCoords,
                 dm.remoterenderer$rigTint(), entry, dm.remoterenderer$rigClip(), dm.remoterenderer$rigPhysicsOff(), collector)) {
@@ -451,7 +479,11 @@ public final class RemoteRenderer {
         }
         halfTurn(poseStack);
         for (MeshEntry.Part part : entry.parts) {
-            collector.submitCustomGeometry(poseStack, part.renderType(), (pose, consumer) -> writeQuads(data, part, pose, consumer, lightCoords));
+            collector.submitCustomGeometry(poseStack, part.renderType(), (pose, consumer) -> {
+                if (!skipShadow()) {
+                    writeQuads(data, part, pose, consumer, lightCoords);
+                }
+            });
         }
         for (MeshEntry.TranslucentLayer layer : entry.translucent) {
             poseStack.pushPose();
@@ -497,20 +529,23 @@ public final class RemoteRenderer {
     }
 
     private static final org.joml.Vector3f CULL_CENTER = new org.joml.Vector3f();
+    private static float CULL_RADIUS;
 
     /** The baked model's bounding sphere, moved by the pose (camera relative), against the view frustum. */
+    /** The bounds' sphere through the pose: CULL_CENTER (camera relative), CULL_RADIUS. Then whether it is outside the view. */
     private static boolean offscreen(org.joml.Matrix4f pose, float[] b) {
-        var camera = Minecraft.getInstance().gameRenderer.mainCamera();
-        var frustum = camera.getCullFrustum();
-        if (frustum == null) {
-            return false;
-        }
         float cx = (b[0] + b[3]) * 0.5F, cy = (b[1] + b[4]) * 0.5F, cz = (b[2] + b[5]) * 0.5F;
         float hx = b[3] - cx, hy = b[4] - cy, hz = b[5] - cz;
         float r = (float) Math.sqrt(hx * hx + hy * hy + hz * hz);
         pose.transformPosition(cx, cy, cz, CULL_CENTER);
         float s = r * (float) Math.sqrt(Math.max(pose.m00() * pose.m00() + pose.m01() * pose.m01() + pose.m02() * pose.m02(),
             Math.max(pose.m10() * pose.m10() + pose.m11() * pose.m11() + pose.m12() * pose.m12(), pose.m20() * pose.m20() + pose.m21() * pose.m21() + pose.m22() * pose.m22())));
+        CULL_RADIUS = s;
+        var camera = Minecraft.getInstance().gameRenderer.mainCamera();
+        var frustum = camera.getCullFrustum();
+        if (frustum == null) {
+            return false;
+        }
         var cam = camera.position();
         // the frustum's planes are relative to the position it was prepared at (the camera's)
         float x = (float) (CULL_CENTER.x + cam.x - frustum.getCamX()), y = (float) (CULL_CENTER.y + cam.y - frustum.getCamY());

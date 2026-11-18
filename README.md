@@ -18,6 +18,10 @@ distinct model once into a GPU buffer and draws all displays of it with one inst
   See [tools/rig/README.md](tools/rig/README.md).
 - **Server item shaders keep working.** When a server pack replaces the item shader (materials, HUDs, decals), RemoteRenderer runs *that* shader instanced.
 - **Off-screen culling** (vanilla draws display entities even behind the camera).
+- **Fast entity path** (`fastEntities`, on by default):
+  - item displays RemoteRenderer draws skip vanilla's per-entity work (name tags, scoreboard, light lookups, pose stack copies);
+  - displays whose model is off screen are dropped before their render state is even extracted;
+  - displays with a name, glowing or a shadow still go the vanilla way.
 - Settings screen (Mod Menu or `/remoterenderer menu`). English, 한국어, 日本語, 简体中文, 繁體中文.
 - Targets the latest **BetterModel (3.6.0)**. Nothing changes on the server; players without the mod see vanilla.
 
@@ -31,7 +35,8 @@ distinct model once into a GPU buffer and draws all displays of it with one inst
 - **With Iris shader packs** (`shaderCompat`, on by default):
   - the baked models and rigs are handed to vanilla render types, so the pack draws them with its own programs and shadows;
   - model resolution is still skipped, and rigs are skinned on the CPU;
-  - under Complementary Reimagined: a scene of rigs and BetterModel meshes 17 → 85 FPS; 36 very heavy mesh bones 7 → 16 FPS (the vertices are written on the CPU there, as vanilla does).
+  - under Complementary Reimagined: a scene of rigs and BetterModel meshes 17 → 85 FPS; 36 very heavy mesh bones 7 → 16 FPS (the vertices are written on the CPU there, as vanilla does);
+  - "On, no model shadows" leaves models and rigs out of the pack's shadow pass: about 1.8× faster in that mode, but they cast no shadow.
 
 ## Commands (with Fabric API)
 
@@ -57,7 +62,9 @@ Config file `config/remoterenderer.properties`, all settings are in the settings
 | `hideWhileBakingQuads` / `hideWhileBakingMs` | heavy new models are hidden for the moment their first bake takes |
 | `bakeThreads` | background threads baking new models |
 | `rigs`, `rigPhysics` | rigs and their physics |
+| `fastEntities` | fast entity path for the displays RemoteRenderer draws (off: the vanilla entity path, for mods that change displays) |
 | `shaderCompat` | with an Iris shader pack: go through the pack's programs instead of stepping aside |
+| `compatShadows` | with `shaderCompat`: models and rigs also cast shadows in the pack's shadow pass |
 | `rigTextureMaxSize` | rig textures are scaled down to this when loaded (default 2048) |
 | `rigTextureIdleSeconds` | a rig texture nobody used this long leaves the GPU |
 | `minQuads`, `evictSeconds`, `statsLogSeconds` | |
@@ -112,11 +119,13 @@ Under such packs, plain displays are not culled, because the shader may draw the
 |---|---:|---:|
 | 36 BetterModel mesh bones (2304 triangles each), OpenGL | 22 FPS | 1697 FPS |
 | same, Vulkan + Sodium etc. | 21 FPS | 3155 FPS |
-| ~2600 BetterModel cube-bone displays, OpenGL | 307 FPS | 730 FPS |
+| ~2600 BetterModel cube-bone displays, OpenGL | 299 FPS | 760 FPS |
 | 100 animated objmc models, Vulkan | 784 FPS* | 2923 FPS |
 | 24 heavy mesh bones appearing in the same tick: worst frame | 146–169 ms | 14.5–19.7 ms |
 
 \* vanilla 26.3 does not show objmc models at all.
+
+The same ~2600 cube-bone displays behind the camera: 820 FPS with 0.2.1, 1820 FPS with the fast entity path (they are dropped before extraction).
 
 ## Limits
 

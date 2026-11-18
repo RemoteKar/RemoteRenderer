@@ -29,6 +29,13 @@ public final class EntityCache {
 
     public static final int[] NO_TINTS = new int[0];
 
+    /**
+     * Fast entity path: how far from the entity the drawn model reached last time it was drawn as a plain model (its
+     * sphere's distance + radius; -1: not culled early), and the display's render state then (a new one = new data).
+     */
+    public float cullReach = -1.0F;
+    public @Nullable Object cullRenderState;
+
     private @Nullable ItemStack modelStack;
     private @Nullable ItemModel modelOfStack;
     private int modelGeneration = -1;

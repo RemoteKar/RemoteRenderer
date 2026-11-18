@@ -17,6 +17,7 @@ public final class Stats {
     public long rigBones;
     // off-screen culling: ordinary displays / rig instances not drawn this frame and in the last world frame
     public long frameMeshCulled, frameRigCulled, lastMeshCulled, lastRigCulled;
+    public long frameFastEntities, frameEarlyCulled, lastFastEntities, lastEarlyCulled;
     public long frameRigInstances, frameRigJoints, frameRigVertices, lastRigInstances, lastRigJoints, lastRigVertices;
     private long frameResolvesAtStart, frameBakesAtStart;
     private static final int SLOW_MS = Integer.getInteger("remoterenderer.slowFrameMs", 0);
@@ -92,16 +93,21 @@ public final class Stats {
         this.lastRigCulled = this.frameRigCulled;
         this.frameMeshCulled = 0;
         this.frameRigCulled = 0;
+        this.lastFastEntities = this.frameFastEntities;
+        this.lastEarlyCulled = this.frameEarlyCulled;
+        this.frameFastEntities = 0;
+        this.frameEarlyCulled = 0;
     }
 
     public String line() {
         Minecraft mc = Minecraft.getInstance();
         return String.format(java.util.Locale.ROOT,
-            "active=%s fps=%d frameMs=%.2f maxMs=%.2f instances=%d quads=%d draws=%d models=%d vram=%.1fMB baked=%d bakeMs=%.1f maxBakeMs=%.1f pending=%d evicted=%d resolves=%d cachedResolves=%d staticHits=%d unsupported=%d lateFallbacks=%d rigs=%d rigInstances=%d rigJoints=%d rigVertices=%d rigTexMB=%.1f culled=%d rigCulled=%d",
+            "active=%s fps=%d frameMs=%.2f maxMs=%.2f instances=%d quads=%d draws=%d models=%d vram=%.1fMB baked=%d bakeMs=%.1f maxBakeMs=%.1f pending=%d evicted=%d resolves=%d cachedResolves=%d staticHits=%d unsupported=%d lateFallbacks=%d rigs=%d rigInstances=%d rigJoints=%d rigVertices=%d rigTexMB=%.1f culled=%d rigCulled=%d fast=%d earlyCulled=%d",
             RemoteRenderer.active(), mc.getFps(), this.avgFrameMs, this.maxFrameMs, this.lastInstances, this.lastQuads, this.lastDraws, MeshCache.size(),
             MeshCache.residentBytes() / 1048576.0, this.baked, this.bakeNanos / 1.0e6, this.maxBakeNanos / 1.0e6, MeshCache.pending(), this.evicted,
             this.resolves, this.cachedResolves, this.staticHits, this.unsupported, this.lateFallbacks,
             kr.gcb.remoterenderer.rig.RigManager.rigs().size(), this.lastRigInstances, this.lastRigJoints, this.lastRigVertices,
-            kr.gcb.remoterenderer.rig.RigManager.textureBytes() / 1048576.0, this.lastMeshCulled, this.lastRigCulled);
+            kr.gcb.remoterenderer.rig.RigManager.textureBytes() / 1048576.0, this.lastMeshCulled, this.lastRigCulled,
+            this.lastFastEntities, this.lastEarlyCulled);
     }
 }

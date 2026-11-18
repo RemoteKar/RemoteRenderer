@@ -51,6 +51,9 @@
   "remoterenderer.cmd.minquads": "RemoteRenderer: minQuads = %s",
   "remoterenderer.cmd.status": "RemoteRenderer %s%s | %s",
   "remoterenderer.menu.shaderCompat": "シェーダーパックと併用",
-  "remoterenderer.menu.shaderCompat.tip": "Iris のシェーダーパックが有効なとき、モデルとリグをパックのプログラム(照明・影)に渡します。モデル解決は引き続き省略し、リグは CPU でスキニングします。",
-  "remoterenderer.menu.state.shaderCompat": "シェーダーパックと併用中(パックのプログラム・影で描画)"
+  "remoterenderer.menu.shaderCompat.tip": "Iris のシェーダーパックが有効なとき、モデルとリグをパックのプログラム(照明・影)に渡します。モデル解決は引き続き省略し、リグは CPU でスキニングします。「モデルの影なし」はパックの影パスから外し、約 2 倍速くなりますが、モデルは影を落としません。",
+  "remoterenderer.menu.state.shaderCompat": "シェーダーパックと併用中(パックのプログラム・影で描画)",
+  "remoterenderer.menu.fastEntities": "高速エンティティ処理",
+  "remoterenderer.menu.fastEntities.tip": "RemoteRenderer が描くアイテムディスプレイはバニラのエンティティごとの処理(名札、明るさの取得、ポーズスタック)を省き、モデルが画面外のディスプレイは抽出前に除きます。名前・発光・影のあるディスプレイは引き続きバニラの経路です。他の MOD がアイテムディスプレイに与える効果が消えたらオフにしてください。",
+  "remoterenderer.menu.shaderCompat.noShadows": "オン(モデルの影なし)"
 }

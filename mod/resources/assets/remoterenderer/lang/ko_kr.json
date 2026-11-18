@@ -51,6 +51,9 @@
   "remoterenderer.cmd.minquads": "RemoteRenderer: minQuads = %s",
   "remoterenderer.cmd.status": "RemoteRenderer %s%s | %s",
   "remoterenderer.menu.shaderCompat": "셰이더팩과 함께",
-  "remoterenderer.menu.shaderCompat.tip": "Iris 셰이더팩이 켜져 있으면 모델과 리그를 셰이더팩 프로그램(조명·그림자)으로 넘깁니다. 모델 해석은 계속 건너뛰고, 리그는 CPU에서 스키닝합니다.",
-  "remoterenderer.menu.state.shaderCompat": "셰이더팩과 함께 (셰이더팩 프로그램·그림자로 그림)"
+  "remoterenderer.menu.shaderCompat.tip": "Iris 셰이더팩이 켜져 있으면 모델과 리그를 셰이더팩 프로그램(조명·그림자)으로 넘깁니다. 모델 해석은 계속 건너뛰고, 리그는 CPU에서 스키닝합니다. \"모델 그림자 없음\"은 셰이더팩 그림자 패스에서 빼서 약 두 배 빠르지만, 모델이 그림자를 드리우지 않습니다.",
+  "remoterenderer.menu.state.shaderCompat": "셰이더팩과 함께 (셰이더팩 프로그램·그림자로 그림)",
+  "remoterenderer.menu.fastEntities": "빠른 엔티티 처리",
+  "remoterenderer.menu.fastEntities.tip": "RemoteRenderer가 그리는 아이템 디스플레이는 바닐라의 엔티티별 처리(이름표, 조명 조회, 자세 스택)를 건너뛰고, 모델이 화면 밖인 디스플레이는 추출 전에 뺍니다. 이름이 있거나 발광하거나 그림자가 있는 디스플레이는 계속 바닐라 경로로 갑니다. 다른 모드가 아이템 디스플레이에 주는 효과가 사라지면 끄세요.",
+  "remoterenderer.menu.shaderCompat.noShadows": "켬, 모델 그림자 없음"
 }

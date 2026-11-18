@@ -149,7 +149,8 @@ def prepare_client():
     if '--danmo-all' in flags:
         # every mod and config of the user's Danmo263 instance, copied (the instance itself is only read)
         for j in (DANMO / 'mods').glob('*.jar'):
-            if not j.name.startswith('fabric-api-0.163.0'):
+            # not the instance's own RemoteRenderer (the same file name would replace the build under test)
+            if not j.name.startswith(('fabric-api-0.163.0', 'remoterenderer-')):
                 shutil.copy(j, mods)
         if (GAME / 'config').exists():
             shutil.rmtree(GAME / 'config')

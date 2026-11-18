@@ -28,6 +28,18 @@ public abstract class ItemDisplayEntityRenderStateMixin implements RrRenderState
     private @Nullable String remoterenderer$rigClip;
     @Unique
     private boolean remoterenderer$rigPhysicsOff;
+    @Unique
+    private boolean remoterenderer$fast;
+
+    @Override
+    public boolean remoterenderer$fast() {
+        return this.remoterenderer$fast;
+    }
+
+    @Override
+    public void remoterenderer$setFast(boolean fast) {
+        this.remoterenderer$fast = fast;
+    }
 
     @Override
     public boolean remoterenderer$rigPhysicsOff() {

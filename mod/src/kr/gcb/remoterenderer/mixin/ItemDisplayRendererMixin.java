@@ -22,10 +22,15 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(DisplayRenderer.ItemDisplayRenderer.class)
-public abstract class ItemDisplayRendererMixin {
+public abstract class ItemDisplayRendererMixin implements kr.gcb.remoterenderer.duck.RrItemDisplayRenderer {
     @Shadow
     @Final
     private ItemModelResolver itemModelResolver;
+
+    @Override
+    public ItemModelResolver remoterenderer$resolver() {
+        return this.itemModelResolver;
+    }
 
     @WrapOperation(
         method = "extractRenderState(Lnet/minecraft/world/entity/Display$ItemDisplay;Lnet/minecraft/client/renderer/entity/state/ItemDisplayEntityRenderState;F)V",

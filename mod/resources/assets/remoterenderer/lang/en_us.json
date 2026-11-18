@@ -51,6 +51,9 @@
   "remoterenderer.cmd.minquads": "RemoteRenderer: minQuads = %s",
   "remoterenderer.cmd.status": "RemoteRenderer %s%s | %s",
   "remoterenderer.menu.shaderCompat": "With shader packs",
-  "remoterenderer.menu.shaderCompat.tip": "With an Iris shader pack on, models and rigs go through the pack's own programs (its lighting and shadows) instead of the vanilla renderer. Still no model resolving; rigs are skinned on the CPU.",
-  "remoterenderer.menu.state.shaderCompat": "with the shader pack (its programs and shadows)"
+  "remoterenderer.menu.shaderCompat.tip": "With an Iris shader pack on, models and rigs go through the pack's own programs (its lighting and shadows) instead of the vanilla renderer. Still no model resolving; rigs are skinned on the CPU. \"No model shadows\" leaves them out of the pack's shadow pass: about twice as fast, but they cast no shadow.",
+  "remoterenderer.menu.state.shaderCompat": "with the shader pack (its programs and shadows)",
+  "remoterenderer.menu.fastEntities": "Fast entity path",
+  "remoterenderer.menu.fastEntities.tip": "Item displays RemoteRenderer draws skip vanilla's per-entity work (name tags, light lookups, pose stack), and displays whose model is off screen are dropped before extraction. Displays with a name, glowing or a shadow still go the vanilla way. Turn off if another mod's effects on item displays stop working.",
+  "remoterenderer.menu.shaderCompat.noShadows": "On, no model shadows"
 }
