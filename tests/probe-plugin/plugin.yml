@@ -1,0 +1,14 @@
+name: DmProbe
+version: 1.0
+main: kr.gcb.dmprobe.DmProbe
+api-version: '1.21'
+depend: [BetterModel]
+description: Test-only helper for the RemoteRenderer tests (BetterModel models on mobs from the console).
+commands:
+  dmprobe:
+    description: RemoteRenderer test helper
+    usage: /dmprobe spawn|anim|clear
+    permission: dmprobe.use
+permissions:
+  dmprobe.use:
+    default: op

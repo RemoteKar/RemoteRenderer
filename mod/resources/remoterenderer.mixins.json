@@ -1,0 +1,27 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "kr.gcb.remoterenderer.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "client": [
+    "CompositeModelAccessor",
+    "ConditionalItemModelAccessor",
+    "CuboidItemModelWrapperAccessor",
+    "FeatureRenderDispatcherMixin",
+    "GameRendererMixin",
+    "ItemDisplayEntityRenderStateMixin",
+    "ItemDisplayMixin",
+    "ItemDisplayRendererMixin",
+    "ItemStackRenderStateAccessor",
+    "ItemStackRenderStateMixin",
+    "LayerRenderStateAccessor",
+    "ModelManagerMixin",
+    "RangeSelectItemModelAccessor",
+    "SelectItemModelAccessor",
+    "ShaderManagerMixin",
+    "SpriteContentsAccessor"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
