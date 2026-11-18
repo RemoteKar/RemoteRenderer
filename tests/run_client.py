@@ -160,7 +160,14 @@ def prepare_client():
             for j in (DANMO / 'mods').glob(pat):
                 shutil.copy(j, mods)
     iris_cfg = GAME / 'config/iris.properties'
-    if '--iris-pack' in flags:
+    if os.environ.get('RR_SHADERPACK'):
+        # a real shader pack (zip) for Iris: RR_SHADERPACK=<path>
+        sp = Path(os.environ['RR_SHADERPACK'])
+        (GAME / 'shaderpacks').mkdir(exist_ok=True)
+        shutil.copy(sp, GAME / 'shaderpacks' / sp.name)
+        iris_cfg.parent.mkdir(parents=True, exist_ok=True)
+        iris_cfg.write_text('enableShaders=true\nshaderPack=%s\nmaxShadowRenderDistance=32\n' % sp.name, encoding='utf-8')
+    elif '--iris-pack' in flags:
         # a minimal shader pack (no programs): enough for Iris to report "shader pack in use"
         import zipfile
         (GAME / 'shaderpacks').mkdir(exist_ok=True)

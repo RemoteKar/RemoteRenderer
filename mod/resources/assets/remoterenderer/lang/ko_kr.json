@@ -49,5 +49,8 @@
   "remoterenderer.cmd.rigs.on": "RemoteRenderer: 리그 켜짐",
   "remoterenderer.cmd.rigs.off": "RemoteRenderer: 리그 꺼짐 (본 디스플레이를 그대로 그림)",
   "remoterenderer.cmd.minquads": "RemoteRenderer: minQuads = %s",
-  "remoterenderer.cmd.status": "RemoteRenderer %s%s | %s"
+  "remoterenderer.cmd.status": "RemoteRenderer %s%s | %s",
+  "remoterenderer.menu.shaderCompat": "셰이더팩과 함께",
+  "remoterenderer.menu.shaderCompat.tip": "Iris 셰이더팩이 켜져 있으면 모델과 리그를 셰이더팩 프로그램(조명·그림자)으로 넘깁니다. 모델 해석은 계속 건너뛰고, 리그는 CPU에서 스키닝합니다.",
+  "remoterenderer.menu.state.shaderCompat": "셰이더팩과 함께 (셰이더팩 프로그램·그림자로 그림)"
 }

@@ -91,6 +91,56 @@ public final class RigTexture {
         return null;
     }
 
+    private net.minecraft.resources.@Nullable Identifier mcId;
+    private static int nextMcId;
+
+    /**
+     * The texture under an id of the vanilla texture manager (for entity render types, which a shader pack draws with
+     * its own programs); null while it is not on the GPU. Render thread.
+     */
+    public net.minecraft.resources.@Nullable Identifier minecraftId(long now) {
+        GpuTextureView v = this.acquire(now);
+        if (v == null || this.texture == null) {
+            return null;
+        }
+        if (this.mcId == null) {
+            this.mcId = net.minecraft.resources.Identifier.fromNamespaceAndPath("remoterenderer", "rig/" + nextMcId++);
+            McTexture wrapper = new McTexture(this.texture, v);
+            Minecraft.getInstance().getTextureManager().register(this.mcId, wrapper);
+        }
+        return this.mcId;
+    }
+
+    private void releaseMcId() {
+        if (this.mcId != null) {
+            Minecraft.getInstance().getTextureManager().release(this.mcId);
+            this.mcId = null;
+        }
+    }
+
+    /** Hands our GPU texture to vanilla without giving it away: closing the wrapper leaves the texture alone. */
+    private static final class McTexture extends net.minecraft.client.renderer.texture.AbstractTexture {
+        McTexture(GpuTexture texture, GpuTextureView view) {
+            this.texture = texture;
+            this.textureView = view;
+            this.sampler = RenderSystem.getSamplerCache().getSampler(com.mojang.renderpearl.api.textures.AddressMode.REPEAT,
+                com.mojang.renderpearl.api.textures.AddressMode.REPEAT, com.mojang.renderpearl.api.textures.FilterMode.LINEAR,
+                com.mojang.renderpearl.api.textures.FilterMode.LINEAR, true);
+        }
+
+        @Override
+        public void close() {
+            this.texture = null;
+            this.textureView = null;
+        }
+
+        @Override
+        protected void releaseTextures() {
+            this.texture = null;
+            this.textureView = null;
+        }
+    }
+
     /** The view uploaded by acquire this frame (execute phase). */
     public @Nullable GpuTextureView view() {
         return this.view;
@@ -112,6 +162,7 @@ public final class RigTexture {
     /** Frees the GPU texture if no model used it for idleNanos (render thread, outside a pass). */
     void evictIfIdle(long now, long idleNanos) {
         if (this.view != null && now - this.lastUsed > idleNanos) {
+            this.releaseMcId();
             RemoteRenderer.LOG.info("Rig texture {} {}: GPU memory freed", this.id, idleNanos == 0L ? "dropped" : "unused for " + idleNanos / 1_000_000_000L + " s");
             this.view.close();
             this.view = null;
@@ -173,6 +224,7 @@ public final class RigTexture {
 
     void close() {
         this.closed = true;
+        this.releaseMcId();
         NativeImage[] lv = this.levels;
         this.levels = null;
         if (lv != null) {

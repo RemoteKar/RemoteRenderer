@@ -13,6 +13,7 @@ import kr.gcb.remoterenderer.mesh.MeshEntry;
 import kr.gcb.remoterenderer.mesh.MeshKey;
 import kr.gcb.remoterenderer.mixin.CompositeModelAccessor;
 import kr.gcb.remoterenderer.mixin.CuboidItemModelWrapperAccessor;
+import java.nio.ByteBuffer;
 import kr.gcb.remoterenderer.render.MeshSubmit;
 import kr.gcb.remoterenderer.render.PackShaders;
 import kr.gcb.remoterenderer.render.RigSubmit;
@@ -82,7 +83,31 @@ public final class RemoteRenderer {
 
     /** Is the GPU path on right now? */
     public static boolean active() {
-        return config.enabled && !disabled && (customItemShader == null || config.ignoreCustomItemShaders || PackShaders.active()) && !irisShaderPackInUse();
+        if (!config.enabled || disabled) {
+            return false;
+        }
+        if (irisShaderPackInUse()) {
+            // a shader pack draws entities with its own programs: models go through vanilla render types (compat)
+            return config.shaderCompat;
+        }
+        return customItemShader == null || config.ignoreCustomItemShaders || PackShaders.active();
+    }
+
+    /**
+     * An Iris shader pack is on and shaderCompat: the baked models and rigs are handed to vanilla render types (the pack's
+     * programs, its shadow pass) instead of RemoteRenderer's own pipelines. The model resolution is still skipped.
+     */
+    public static boolean compat() {
+        return config.shaderCompat && irisShaderPackInUse();
+    }
+
+    /** LightCoordsUtil.lightCoordsWithEmission: block and sky light raised to the quad's own emission. */
+    public static int withEmission(int light, int emission) {
+        if (emission <= 0) {
+            return light;
+        }
+        int block = Math.max(light & 0xFFFF, emission << 4), sky = Math.max(light >>> 16 & 0xFFFF, emission << 4);
+        return block | sky << 16;
     }
 
     /**
@@ -196,7 +221,8 @@ public final class RemoteRenderer {
             }
         }
         if (inUse != irisShaders) {
-            LOG.info("Iris shader pack {}: RemoteRenderer {}", inUse ? "on" : "off", inUse ? "steps aside" : "takes over again");
+            LOG.info("Iris shader pack {}: RemoteRenderer {}", inUse ? "on" : "off", !inUse ? "draws with its own pipelines again"
+                : config.shaderCompat ? "hands its models and rigs to the pack's programs (shaderCompat)" : "steps aside (shaderCompat=false)");
             MeshCache.requestClear();
         }
         irisShaders = inUse;
@@ -346,6 +372,9 @@ public final class RemoteRenderer {
         if (target == null) {
             return false;
         }
+        if (compat()) {
+            return submitCompat(dm, poseStack, collector, lightCoords, entry, rig);
+        }
         if (rig != null && dm.remoterenderer$rigInstance() != null) {
             Object instance = dm.remoterenderer$rigInstance();
             if (rig.rig().def.boneGeometry()) {
@@ -374,7 +403,7 @@ public final class RemoteRenderer {
         PoseStack.Pose pose = poseStack.last();
         // not with a pack's own item shader: such shaders may draw a display somewhere else than where it stands (a HUD
         // kept out of sight and moved onto the screen by item.vsh), and vanilla draws every display anyway
-        if (config.cullOffscreen && customItemShader == null && entry.objmcParts.isEmpty() && entry.translucent.isEmpty() && entry.solidQuads > 0
+        if (config.cullOffscreen && customItemShader == null && !compat() && entry.objmcParts.isEmpty() && entry.translucent.isEmpty() && entry.solidQuads > 0
             && offscreen(pose.pose(), entry.bounds)) {
             // vanilla draws display entities even off screen (Display.noCulling); the box of the baked model is outside the view
             STATS.frameMeshCulled++;
@@ -396,6 +425,61 @@ public final class RemoteRenderer {
     }
 
     /** The vanilla path after all, for a state whose item extract did not resolve. */
+    /**
+     * Shader-pack mode: the baked model's quads are written into vanilla's buffers for its render types (one custom
+     * geometry per part instead of one item submit per layer - thousands for a BetterModel mesh bone), so the shader
+     * pack draws them with its own programs and puts them into its shadow map too. Rigs are skinned on the CPU.
+     */
+    private static boolean submitCompat(RrRenderState dm, PoseStack poseStack, SubmitNodeCollector collector, int lightCoords, @Nullable MeshEntry entry,
+                                        RigManager.@Nullable BoneRef rig) {
+        if (rig != null && dm.remoterenderer$rigInstance() != null && (!rig.rig().def.boneGeometry() || entry != null && entry.cpuVertices() != null)) {
+            if (kr.gcb.remoterenderer.render.RigRenderer.compatSubmit(rig, dm.remoterenderer$rigInstance(), poseStack.last().pose(), lightCoords,
+                dm.remoterenderer$rigTint(), entry, dm.remoterenderer$rigClip(), dm.remoterenderer$rigPhysicsOff(), collector)) {
+                return true;
+            }
+        }
+        if (entry == null || entry.isRetired() || !entry.objmcParts.isEmpty()) {
+            return false;
+        }
+        ByteBuffer data = entry.cpuVertices();
+        if (data == null) {
+            return false;
+        }
+        poseStack.rotate(Axis.YP, (float) Math.PI);
+        for (MeshEntry.Part part : entry.parts) {
+            collector.submitCustomGeometry(poseStack, part.renderType(), (pose, consumer) -> writeQuads(data, part, pose, consumer, lightCoords));
+        }
+        for (MeshEntry.TranslucentLayer layer : entry.translucent) {
+            poseStack.pushPose();
+            poseStack.last().mulPose(layer.pose());
+            collector.submitItem(poseStack, entry.context, lightCoords, OverlayTexture.NO_OVERLAY, 0, layer.tints(), layer.quads(),
+                ItemStackRenderState.FoilType.NONE);
+            poseStack.popPose();
+        }
+        STATS.frameInstances++;
+        return true;
+    }
+
+    private static final org.joml.Vector3f WRITE_P = new org.joml.Vector3f(), WRITE_N = new org.joml.Vector3f();
+
+    /** A part's baked quads (32-byte vertices, model space) through the pose into a vanilla vertex consumer. */
+    private static void writeQuads(ByteBuffer d, MeshEntry.Part part, PoseStack.Pose pose, com.mojang.blaze3d.vertex.VertexConsumer out, int light) {
+        org.joml.Matrix4f m = pose.pose();
+        org.joml.Matrix3f n = pose.normal();
+        for (int i = 0; i < part.quadCount() * 4; i++) {
+            int at = (part.firstVertex() + i) * 32;
+            m.transformPosition(d.getFloat(at), d.getFloat(at + 4), d.getFloat(at + 8), WRITE_P);
+            n.transform(d.get(at + 24) / 127.0F, d.get(at + 25) / 127.0F, d.get(at + 26) / 127.0F, WRITE_N);
+            if (WRITE_N.lengthSquared() > 1.0e-12F) {
+                WRITE_N.normalize();
+            }
+            int color = (d.get(at + 15) & 255) << 24 | (d.get(at + 12) & 255) << 16 | (d.get(at + 13) & 255) << 8 | d.get(at + 14) & 255;
+            out.addVertex(WRITE_P.x, WRITE_P.y, WRITE_P.z, color, d.getFloat(at + 16), d.getFloat(at + 20), OverlayTexture.NO_OVERLAY,
+                withEmission(light, d.get(at + 28) & 255), WRITE_N.x, WRITE_N.y, WRITE_N.z);
+        }
+        STATS.frameQuads += part.quadCount();
+    }
+
     private static final org.joml.Vector3f CULL_CENTER = new org.joml.Vector3f();
 
     /** The baked model's bounding sphere, moved by the pose (camera relative), against the view frustum. */

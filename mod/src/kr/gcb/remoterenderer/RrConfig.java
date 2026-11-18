@@ -38,6 +38,8 @@ public final class RrConfig {
     public boolean cullOffscreen = true;
     /** Spring joints (hair, skirts, ribbons) declared by rigs move with physics. */
     public boolean rigPhysics = true;
+    /** With an Iris shader pack: keep working through vanilla render types (the pack's programs and shadows) instead of stepping aside. */
+    public boolean shaderCompat = true;
     /** Rig textures larger than this (pixels per side) are halved until they fit, when loaded (0 = as they are). */
     public int rigTextureMaxSize = 2048;
     /** A rig texture no model used for this many seconds leaves the GPU (loaded again when needed). */
@@ -68,6 +70,8 @@ public final class RrConfig {
         c.rigs = bool(p, "rigs", c.rigs);
         c.cullOffscreen = bool(p, "cullOffscreen", c.cullOffscreen);
         c.rigPhysics = bool(p, "rigPhysics", c.rigPhysics);
+        c.shaderCompat = bool(p, "shaderCompat", c.shaderCompat);
+        c.shaderCompat = Boolean.parseBoolean(System.getProperty("remoterenderer.shaderCompat", Boolean.toString(c.shaderCompat)));
         c.cullOffscreen = Boolean.parseBoolean(System.getProperty("remoterenderer.cullOffscreen", Boolean.toString(c.cullOffscreen)));
         c.rigPhysics = Boolean.parseBoolean(System.getProperty("remoterenderer.rigPhysics", Boolean.toString(c.rigPhysics)));
         c.rigTextureMaxSize = Math.max(0, integer(p, "rigTextureMaxSize", c.rigTextureMaxSize));
@@ -120,6 +124,8 @@ public final class RrConfig {
                 w.write("cullOffscreen=" + this.cullOffscreen + "\n");
                 w.write("# rigPhysics: spring joints (hair, skirts, ribbons) declared by rigs swing with physics\n");
                 w.write("rigPhysics=" + this.rigPhysics + "\n");
+                w.write("# shaderCompat: with an Iris shader pack, hand models and rigs to the pack's programs (its shadows too) instead of stepping aside\n");
+                w.write("shaderCompat=" + this.shaderCompat + "\n");
                 w.write("# rigTextureMaxSize: rig textures bigger than this are scaled down when loaded (0 = keep; 2048 = a quarter of the memory of 4096, the same picture at play distance)\n");
                 w.write("rigTextureMaxSize=" + this.rigTextureMaxSize + "\n");
                 w.write("# rigTextureIdleSeconds: a rig texture unused this long leaves the GPU\n");

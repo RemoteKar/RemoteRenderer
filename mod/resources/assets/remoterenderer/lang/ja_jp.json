@@ -49,5 +49,8 @@
   "remoterenderer.cmd.rigs.on": "RemoteRenderer: リグ オン",
   "remoterenderer.cmd.rigs.off": "RemoteRenderer: リグ オフ(ボーンディスプレイをそのまま描画)",
   "remoterenderer.cmd.minquads": "RemoteRenderer: minQuads = %s",
-  "remoterenderer.cmd.status": "RemoteRenderer %s%s | %s"
+  "remoterenderer.cmd.status": "RemoteRenderer %s%s | %s",
+  "remoterenderer.menu.shaderCompat": "シェーダーパックと併用",
+  "remoterenderer.menu.shaderCompat.tip": "Iris のシェーダーパックが有効なとき、モデルとリグをパックのプログラム(照明・影)に渡します。モデル解決は引き続き省略し、リグは CPU でスキニングします。",
+  "remoterenderer.menu.state.shaderCompat": "シェーダーパックと併用中(パックのプログラム・影で描画)"
 }

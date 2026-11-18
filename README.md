@@ -28,7 +28,10 @@ distinct model once into a GPU buffer and draws all displays of it with one inst
 - Only Fabric Loader is required. Fabric API gives the `/remoterenderer` command; Mod Menu gives the config button.
 - OpenGL and Vulkan both work (only 26.3's RenderPearl API is used; the shaders are compiled from the jar).
 - Tested with vanilla Fabric and with a 266-mod pack (Sodium, Sodium Extra, Iris, Lithium, ModernFix, EntityCulling, MoreCulling, Mod Menu, …).
-  When an Iris shader pack is active, the mod steps aside and Iris draws everything.
+- **With Iris shader packs** (`shaderCompat`, on by default):
+  - the baked models and rigs are handed to vanilla render types, so the pack draws them with its own programs and shadows;
+  - model resolution is still skipped, and rigs are skinned on the CPU;
+  - under Complementary Reimagined: a scene of rigs and BetterModel meshes 17 → 85 FPS; 36 very heavy mesh bones 7 → 14 FPS (the vertices are written on the CPU there, as vanilla does).
 
 ## Commands (with Fabric API)
 
@@ -54,6 +57,7 @@ Config file `config/remoterenderer.properties`, all settings are in the settings
 | `hideWhileBakingQuads` / `hideWhileBakingMs` | heavy new models are hidden for the moment their first bake takes |
 | `bakeThreads` | background threads baking new models |
 | `rigs`, `rigPhysics` | rigs and their physics |
+| `shaderCompat` | with an Iris shader pack: go through the pack's programs instead of stepping aside |
 | `rigTextureMaxSize` | rig textures are scaled down to this when loaded (default 2048) |
 | `rigTextureIdleSeconds` | a rig texture nobody used this long leaves the GPU |
 | `minQuads`, `evictSeconds`, `statsLogSeconds` | |

@@ -49,6 +49,9 @@ public final class RigGeometry {
     public float @Nullable [] springTails;
     private @Nullable ByteBuffer vertexData;
     private @Nullable ByteBuffer indexData;
+    /** kept after the upload: under an Iris shader pack the rig is skinned on the CPU (RigCompat) */
+    private @Nullable ByteBuffer cpuVertices;
+    private @Nullable ByteBuffer cpuIndices;
     private @Nullable GpuBuffer vertexBuffer;
     private @Nullable GpuBuffer indexBuffer;
     private boolean closed;
@@ -75,15 +78,27 @@ public final class RigGeometry {
             ByteBuffer d = this.vertexData;
             this.vertexData = null;
             this.vertexBuffer = device.createBuffer(() -> "RemoteRenderer rig vertices", GpuBuffer.USAGE_VERTEX, d);
-            MemoryUtil.memFree(d);
+            this.cpuVertices = d;
         }
         if (this.indexData != null) {
             ByteBuffer d = this.indexData;
             this.indexData = null;
             this.indexBuffer = device.createBuffer(() -> "RemoteRenderer rig indices", GpuBuffer.USAGE_INDEX, d);
-            MemoryUtil.memFree(d);
+            this.cpuIndices = d;
         }
         return this.vertexBuffer != null;
+    }
+
+    /** The vertices (40 bytes each) on the CPU, as a view. */
+    public @Nullable ByteBuffer cpuVertices() {
+        ByteBuffer d = this.vertexData != null ? this.vertexData : this.cpuVertices;
+        return d == null || this.closed ? null : d.duplicate().order(ByteOrder.nativeOrder());
+    }
+
+    /** The triangle indices on the CPU (mesh geometry), as a view; null for quads. */
+    public @Nullable ByteBuffer cpuIndices() {
+        ByteBuffer d = this.indexData != null ? this.indexData : this.cpuIndices;
+        return d == null || this.closed ? null : d.duplicate().order(ByteOrder.nativeOrder());
     }
 
     public @Nullable GpuBuffer vertexBuffer() {
@@ -100,6 +115,14 @@ public final class RigGeometry {
 
     void close() {
         this.closed = true;
+        if (this.cpuVertices != null) {
+            MemoryUtil.memFree(this.cpuVertices);
+            this.cpuVertices = null;
+        }
+        if (this.cpuIndices != null) {
+            MemoryUtil.memFree(this.cpuIndices);
+            this.cpuIndices = null;
+        }
         if (this.vertexData != null) {
             MemoryUtil.memFree(this.vertexData);
             this.vertexData = null;

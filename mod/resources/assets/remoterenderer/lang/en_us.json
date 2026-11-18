@@ -49,5 +49,8 @@
   "remoterenderer.cmd.rigs.on": "RemoteRenderer: rigs on",
   "remoterenderer.cmd.rigs.off": "RemoteRenderer: rigs off (bone displays drawn as they are)",
   "remoterenderer.cmd.minquads": "RemoteRenderer: minQuads = %s",
-  "remoterenderer.cmd.status": "RemoteRenderer %s%s | %s"
+  "remoterenderer.cmd.status": "RemoteRenderer %s%s | %s",
+  "remoterenderer.menu.shaderCompat": "With shader packs",
+  "remoterenderer.menu.shaderCompat.tip": "With an Iris shader pack on, models and rigs go through the pack's own programs (its lighting and shadows) instead of the vanilla renderer. Still no model resolving; rigs are skinned on the CPU.",
+  "remoterenderer.menu.state.shaderCompat": "with the shader pack (its programs and shadows)"
 }

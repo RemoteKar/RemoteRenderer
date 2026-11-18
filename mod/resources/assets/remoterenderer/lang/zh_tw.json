@@ -49,5 +49,8 @@
   "remoterenderer.cmd.rigs.on": "RemoteRenderer: 骨骼綁定已開啟",
   "remoterenderer.cmd.rigs.off": "RemoteRenderer: 骨骼綁定已關閉(按原樣繪製骨骼展示實體)",
   "remoterenderer.cmd.minquads": "RemoteRenderer: minQuads = %s",
-  "remoterenderer.cmd.status": "RemoteRenderer %s%s | %s"
+  "remoterenderer.cmd.status": "RemoteRenderer %s%s | %s",
+  "remoterenderer.menu.shaderCompat": "與光影包共用",
+  "remoterenderer.menu.shaderCompat.tip": "Iris 光影包開啟時,模型和骨骼綁定交給光影包的程式(光照、陰影)繪製。仍然跳過模型解析,骨骼綁定在 CPU 上蒙皮。",
+  "remoterenderer.menu.state.shaderCompat": "與光影包共用(由光影包程式和陰影繪製)"
 }

@@ -20,6 +20,7 @@ public final class RrConfigScreen extends Screen {
     private final @Nullable Screen parent;
     private boolean dirtyMeshes;
     private boolean dirtyShaders;
+    private boolean compact;
 
     public RrConfigScreen(@Nullable Screen parent) {
         super(Component.translatable("remoterenderer.menu.title"));
@@ -29,9 +30,11 @@ public final class RrConfigScreen extends Screen {
     @Override
     protected void init() {
         RrConfig c = RemoteRenderer.config;
-        int w = 150, h = 20, gap = 4;
+        // compact on small screens (large GUI scale): 8 rows, no status lines
+        this.compact = this.height < 320;
+        int w = 150, h = 20, gap = this.compact ? 2 : 4;
         int left = this.width / 2 - w - 5, right = this.width / 2 + 5;
-        int y0 = 40;
+        int y0 = this.compact ? 32 : 40;
         // left: drawing displays on the GPU
         int y = y0;
         this.toggle(left, y, w, h, "enabled", c.enabled, v -> RemoteRenderer.setEnabled(v));
@@ -47,6 +50,11 @@ public final class RrConfigScreen extends Screen {
         });
         y += h + gap;
         this.toggle(left, y, w, h, "cullOffscreen", c.cullOffscreen, v -> c.cullOffscreen = v);
+        y += h + gap;
+        this.toggle(left, y, w, h, "shaderCompat", c.shaderCompat, v -> {
+            c.shaderCompat = v;
+            this.dirtyMeshes = true;
+        });
         y += h + gap;
         this.toggle(left, y, w, h, "adaptCustomItemShaders", c.adaptCustomItemShaders, v -> {
             c.adaptCustomItemShaders = v;
@@ -87,7 +95,7 @@ public final class RrConfigScreen extends Screen {
             Minecraft.getInstance().reloadResourcePacks();
         }).bounds(right, y, w, h).tooltip(Tooltip.create(Component.translatable("remoterenderer.menu.reload.tip"))).build());
 
-        this.addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> this.onClose()).bounds(this.width / 2 - 100, this.height - 28, 200, 20).build());
+        this.addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> this.onClose()).bounds(this.width / 2 - 100, this.height - (this.compact ? 24 : 28), 200, 20).build());
     }
 
     private void toggle(int x, int y, int w, int h, String key, boolean value, Consumer<Boolean> set) {
@@ -106,13 +114,14 @@ public final class RrConfigScreen extends Screen {
     @Override
     public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
         super.extractRenderState(g, mouseX, mouseY, partialTick);
-        g.centeredText(this.font, this.title, this.width / 2, 12, 0xFFFFFFFF);
-        g.centeredText(this.font, Component.translatable("remoterenderer.menu.displays"), this.width / 2 - 80, 28, 0xFFA0A0A0);
-        g.centeredText(this.font, Component.translatable("remoterenderer.menu.rigsHeader"), this.width / 2 + 80, 28, 0xFFA0A0A0);
+        g.centeredText(this.font, this.title, this.width / 2, this.compact ? 6 : 12, 0xFFFFFFFF);
+        g.centeredText(this.font, Component.translatable("remoterenderer.menu.displays"), this.width / 2 - 80, this.compact ? 20 : 28, 0xFFA0A0A0);
+        g.centeredText(this.font, Component.translatable("remoterenderer.menu.rigsHeader"), this.width / 2 + 80, this.compact ? 20 : 28, 0xFFA0A0A0);
         Stats s = RemoteRenderer.STATS;
         String state;
         if (RemoteRenderer.active()) {
-            state = Component.translatable("remoterenderer.menu.state.on").getString() + (kr.gcb.remoterenderer.render.PackShaders.active()
+            state = Component.translatable("remoterenderer.menu.state.on").getString() + (RemoteRenderer.compat()
+                ? " - " + Component.translatable("remoterenderer.menu.state.shaderCompat").getString() : "") + (kr.gcb.remoterenderer.render.PackShaders.active() && !RemoteRenderer.compat()
                 ? " - " + Component.translatable("remoterenderer.menu.state.packShader", String.valueOf(RemoteRenderer.customItemShader())).getString() : "");
         } else {
             String reason = RemoteRenderer.disabledReason();
@@ -121,6 +130,9 @@ public final class RrConfigScreen extends Screen {
                     + (kr.gcb.remoterenderer.render.PackShaders.failure() != null ? " (" + kr.gcb.remoterenderer.render.PackShaders.failure() + ")" : "");
             }
             state = Component.translatable("remoterenderer.menu.state.off").getString() + (reason != null ? " - " + reason : "");
+        }
+        if (this.compact) {
+            return;
         }
         int y = this.height - 70;
         g.centeredText(this.font, state, this.width / 2, y, RemoteRenderer.active() ? 0xFF80FF80 : 0xFFFFC060);

@@ -15,6 +15,7 @@ public abstract class GameRendererMixin {
         kr.gcb.remoterenderer.mesh.MeshCache.poll();
         // every frame, also when no rig is drawn (rig textures nobody uses leave the GPU)
         kr.gcb.remoterenderer.rig.RigManager.endFrame(System.nanoTime());
+        kr.gcb.remoterenderer.render.RigRenderer.compatFrame();
         net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
         if (RemoteRenderer.openMenu && mc.level != null && mc.gui.screen() == null) {
             RemoteRenderer.openMenu = false;

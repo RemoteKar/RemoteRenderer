@@ -83,6 +83,11 @@ public final class RigRenderer implements FeatureRenderer<RigSubmit> {
         boolean physicsOff;
         final RigPhysics.State physics;
         final Matrix4f[] palette;
+        // shader-pack mode (compatSubmit): the pass this instance's bones were last collected in
+        @Nullable Object compatCollector;
+        long compatFrame = -1;
+        boolean compatPosed;
+        final java.util.Set<RenderType> compatTypes = new java.util.HashSet<>();
 
         Instance(Object vehicle, RigManager.Rig rig) {
             this.vehicle = vehicle;
@@ -557,5 +562,187 @@ public final class RigRenderer implements FeatureRenderer<RigSubmit> {
         if (this.jointRing != null) {
             this.jointRing.close();
         }
+    }
+
+    // ---------------------------------------------------------------- Iris shader packs: CPU skinning, vanilla render types
+
+    private static final RigRenderer COMPAT = new RigRenderer();
+    private static long compatFrame;
+    private final org.joml.Vector3f sp = new org.joml.Vector3f(), sn = new org.joml.Vector3f();
+
+    /** Once a frame (GameRenderer.render). */
+    public static void compatFrame() {
+        compatFrame++;
+        long now = System.nanoTime();
+        COMPAT.instances.values().removeIf(i -> now - i.lastSeen > 5_000_000_000L);
+    }
+
+    /**
+     * Under an Iris shader pack, which draws entities with its own programs (and again into its shadow map): one bone
+     * display of a rig. The bones of an instance are collected per pass; the first one registers the instance's draws
+     * with vanilla's collector (one custom geometry per render type), and vanilla fills them when it prepares them -
+     * after every bone of the pass is in. The vertices are skinned on the CPU and go through the pack's programs.
+     */
+    public static boolean compatSubmit(RigManager.BoneRef ref, Object vehicle, org.joml.Matrix4fc pose, int light, int tint, @Nullable MeshEntry entry,
+                                       @Nullable String clip, boolean physicsOff, net.minecraft.client.renderer.OrderedSubmitNodeCollector collector) {
+        RigRenderer r = COMPAT;
+        long now = System.nanoTime();
+        InstanceKey key = new InstanceKey(vehicle, ref.rig());
+        Instance inst = r.instances.get(key);
+        if (inst == null) {
+            inst = new Instance(vehicle, ref.rig());
+            r.instances.put(key, inst);
+        }
+        if (inst.compatCollector != collector || inst.compatFrame != compatFrame) {
+            inst.compatCollector = collector;
+            inst.compatFrame = compatFrame;
+            Arrays.fill(inst.present, false);
+            inst.clipRequest = null;
+            inst.compatTypes.clear();
+            inst.compatPosed = false;
+        }
+        int b = ref.bone();
+        inst.k[b].set(pose).mul(inst.def.bones.get(b).restInverse());
+        inst.present[b] = true;
+        if (entry != null) {
+            inst.entries[b] = entry;
+        }
+        if (b == inst.def.anchor || !inst.present[inst.def.anchor]) {
+            inst.light = light;
+            inst.tint = tint;
+        }
+        if (clip != null) {
+            inst.clipRequest = clip;
+        }
+        inst.physicsOff = physicsOff;
+        inst.lastSeen = now;
+        if (inst.def.boneGeometry()) {
+            if (entry == null) {
+                return false;
+            }
+            for (MeshEntry.Part p : entry.parts) {
+                register(inst, collector, p.renderType());
+            }
+        } else {
+            RigGeometry g = inst.rig.meshGeometry();
+            if (g == null) {
+                return true;
+            }
+            for (RigGeometry.Part p : g.parts) {
+                RenderType type = compatType(p, now);
+                if (type != null) {
+                    register(inst, collector, type);
+                }
+            }
+        }
+        return true;
+    }
+
+    /** A mesh part's vanilla render type: an entity cut-out type on the rig texture (null while it loads). */
+    private static @Nullable RenderType compatType(RigGeometry.Part p, long now) {
+        if (p.renderType() != null) {
+            return p.renderType();
+        }
+        if (p.texture() == null) {
+            return null;
+        }
+        net.minecraft.resources.Identifier id = p.texture().minecraftId(now);
+        if (id == null) {
+            return null;
+        }
+        return p.doubleSided() ? net.minecraft.client.renderer.rendertype.RenderTypes.entityCutout(id)
+            : net.minecraft.client.renderer.rendertype.RenderTypes.entityCutoutCull(id);
+    }
+
+    private static void register(Instance inst, net.minecraft.client.renderer.OrderedSubmitNodeCollector collector, RenderType type) {
+        if (!inst.compatTypes.add(type)) {
+            return;
+        }
+        // camera relative, like the skin matrices
+        collector.submitCustomGeometry(new com.mojang.blaze3d.vertex.PoseStack(), type, (pose, consumer) -> COMPAT.skin(inst, type, consumer));
+    }
+
+    /** Poses the instance once per pass, then writes the parts of this render type, skinned. */
+    private void skin(Instance inst, RenderType type, com.mojang.blaze3d.vertex.VertexConsumer out) {
+        long now = System.nanoTime();
+        RigGeometry g = inst.def.boneGeometry() ? inst.rig.boneGeometry(inst.entries, now) : inst.rig.meshGeometry();
+        if (g == null || g.isClosed()) {
+            return;
+        }
+        if (!inst.compatPosed) {
+            this.pose(inst, now, g, Minecraft.getInstance().gameRenderer.mainCamera().position());
+            inst.compatPosed = true;
+            RemoteRenderer.STATS.frameRigInstances++;
+            RemoteRenderer.STATS.frameRigJoints += inst.palette.length;
+        }
+        ByteBuffer v = g.cpuVertices();
+        if (v == null) {
+            return;
+        }
+        for (RigGeometry.Part p : g.parts) {
+            if (!type.equals(compatType(p, now))) {
+                continue;
+            }
+            if (p.quads()) {
+                for (int i = p.first() * 4, end = (p.first() + p.count()) * 4; i < end; i++) {
+                    this.emit(inst, v, i, out);
+                }
+                RemoteRenderer.STATS.frameRigVertices += p.count() * 4L;
+            } else {
+                ByteBuffer ix = g.cpuIndices();
+                if (ix == null) {
+                    continue;
+                }
+                // vanilla's entity types draw quads: each triangle as a quad with its last corner twice
+                for (int t = p.first(), end = p.first() + p.count(); t + 2 < end + 0 && t + 2 < ix.limit() / 4; t += 3) {
+                    int c = ix.getInt((t + 2) * 4);
+                    this.emit(inst, v, ix.getInt(t * 4), out);
+                    this.emit(inst, v, ix.getInt((t + 1) * 4), out);
+                    this.emit(inst, v, c, out);
+                    this.emit(inst, v, c, out);
+                }
+                RemoteRenderer.STATS.frameRigVertices += p.count();
+            }
+        }
+    }
+
+    private void emit(Instance inst, ByteBuffer d, int vertex, com.mojang.blaze3d.vertex.VertexConsumer out) {
+        int at = vertex * RigGeometry.VERTEX_SIZE;
+        float x = d.getFloat(at), y = d.getFloat(at + 4), z = d.getFloat(at + 8);
+        float nx = d.get(at + 24) / 127.0F, ny = d.get(at + 25) / 127.0F, nz = d.get(at + 26) / 127.0F;
+        float px = 0, py = 0, pz = 0, qx = 0, qy = 0, qz = 0, total = 0;
+        for (int k = 0; k < 4; k++) {
+            float w = (d.get(at + 36 + k) & 255) / 255.0F;
+            if (w <= 0.0F) {
+                continue;
+            }
+            Matrix4f m = inst.palette[Math.min(d.get(at + 32 + k) & 255, inst.palette.length - 1)];
+            px += w * (m.m00() * x + m.m10() * y + m.m20() * z + m.m30());
+            py += w * (m.m01() * x + m.m11() * y + m.m21() * z + m.m31());
+            pz += w * (m.m02() * x + m.m12() * y + m.m22() * z + m.m32());
+            qx += w * (m.m00() * nx + m.m10() * ny + m.m20() * nz);
+            qy += w * (m.m01() * nx + m.m11() * ny + m.m21() * nz);
+            qz += w * (m.m02() * nx + m.m12() * ny + m.m22() * nz);
+            total += w;
+        }
+        if (total > 0.0F) {
+            px /= total;
+            py /= total;
+            pz /= total;
+        }
+        float len = (float) Math.sqrt(qx * qx + qy * qy + qz * qz);
+        if (len > 1.0e-6F) {
+            qx /= len;
+            qy /= len;
+            qz /= len;
+        } else {
+            qy = 1.0F;
+        }
+        int tint = inst.tint;
+        int r = (d.get(at + 12) & 255) * (tint >> 16 & 255) / 255, gg = (d.get(at + 13) & 255) * (tint >> 8 & 255) / 255;
+        int bb = (d.get(at + 14) & 255) * (tint & 255) / 255, a = (d.get(at + 15) & 255) * (tint >>> 24) / 255;
+        int emission = d.get(at + 28) & 255;
+        out.addVertex(px, py, pz, a << 24 | r << 16 | gg << 8 | bb, d.getFloat(at + 16), d.getFloat(at + 20),
+            net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, RemoteRenderer.withEmission(inst.light, emission), qx, qy, qz);
     }
 }
