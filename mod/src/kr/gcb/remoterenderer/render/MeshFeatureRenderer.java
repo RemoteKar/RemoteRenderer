@@ -159,13 +159,15 @@ public final class MeshFeatureRenderer implements FeatureRenderer<MeshSubmit> {
     private void writeMeshInstance(MeshSubmit s) {
         this.ensureRoom(MESH_STRIDE);
         ByteBuffer buf = this.scratch;
+        long at = MemoryUtil.memAddress(buf);
         float[] m = s.matrix;
         for (int i = 0; i < 25; i++) {
-            buf.putFloat(m[i]);
+            MemoryUtil.memPutFloat(at + i * 4L, m[i]);
         }
-        int light = s.light, overlay = s.overlay;
-        buf.putShort((short) (light & 0xFFFF)).putShort((short) (light >>> 16 & 0xFFFF));
-        buf.putShort((short) (overlay & 0xFFFF)).putShort((short) (overlay >>> 16 & 0xFFFF));
+        // light and overlay as two shorts each (u, v): with native little-endian order that is the int itself
+        MemoryUtil.memPutInt(at + 100, s.light);
+        MemoryUtil.memPutInt(at + 104, s.overlay);
+        buf.position(buf.position() + MESH_STRIDE);
     }
 
     private void writeObjmcInstance(MeshSubmit s, MeshEntry.ObjmcPart part, int tint) {

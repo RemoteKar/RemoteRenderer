@@ -29,6 +29,21 @@ public final class EntityCache {
 
     public static final int[] NO_TINTS = new int[0];
 
+    private @Nullable ItemStack modelStack;
+    private @Nullable ItemModel modelOfStack;
+    private int modelGeneration = -1;
+
+    /** The item model the stack's item_model names, looked up again only for another stack object or after a reload. */
+    public @Nullable ItemModel model(ItemStack stack, int generation) {
+        if (this.modelStack != stack || this.modelGeneration != generation) {
+            net.minecraft.resources.Identifier id = stack.get(net.minecraft.core.component.DataComponents.ITEM_MODEL);
+            this.modelOfStack = id == null ? null : net.minecraft.client.Minecraft.getInstance().getModelManager().getItemModel(id);
+            this.modelStack = stack;
+            this.modelGeneration = generation;
+        }
+        return this.modelOfStack;
+    }
+
     private MeshCache.@Nullable StaticKey staticKey;
     private @Nullable ItemStack staticKeyStack;
     private @Nullable ItemModel staticKeyModel;

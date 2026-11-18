@@ -706,17 +706,18 @@ public final class RigRenderer implements FeatureRenderer<RigSubmit> {
         }
     }
 
-    private void emit(Instance inst, ByteBuffer d, int vertex, com.mojang.blaze3d.vertex.VertexConsumer out) {
-        int at = vertex * RigGeometry.VERTEX_SIZE;
-        float x = d.getFloat(at), y = d.getFloat(at + 4), z = d.getFloat(at + 8);
-        float nx = d.get(at + 24) / 127.0F, ny = d.get(at + 25) / 127.0F, nz = d.get(at + 26) / 127.0F;
+    private void emit(Instance inst, ByteBuffer buf, int vertex, com.mojang.blaze3d.vertex.VertexConsumer out) {
+        // through the address: DirectByteBuffer getters cost half the frame here
+        long at = MemoryUtil.memAddress(buf, 0) + (long) vertex * RigGeometry.VERTEX_SIZE;
+        float x = MemoryUtil.memGetFloat(at), y = MemoryUtil.memGetFloat(at + 4), z = MemoryUtil.memGetFloat(at + 8);
+        float nx = MemoryUtil.memGetByte(at + 24) / 127.0F, ny = MemoryUtil.memGetByte(at + 25) / 127.0F, nz = MemoryUtil.memGetByte(at + 26) / 127.0F;
         float px = 0, py = 0, pz = 0, qx = 0, qy = 0, qz = 0, total = 0;
         for (int k = 0; k < 4; k++) {
-            float w = (d.get(at + 36 + k) & 255) / 255.0F;
+            float w = (MemoryUtil.memGetByte(at + 36 + k) & 255) / 255.0F;
             if (w <= 0.0F) {
                 continue;
             }
-            Matrix4f m = inst.palette[Math.min(d.get(at + 32 + k) & 255, inst.palette.length - 1)];
+            Matrix4f m = inst.palette[Math.min(MemoryUtil.memGetByte(at + 32 + k) & 255, inst.palette.length - 1)];
             px += w * (m.m00() * x + m.m10() * y + m.m20() * z + m.m30());
             py += w * (m.m01() * x + m.m11() * y + m.m21() * z + m.m31());
             pz += w * (m.m02() * x + m.m12() * y + m.m22() * z + m.m32());
@@ -739,10 +740,10 @@ public final class RigRenderer implements FeatureRenderer<RigSubmit> {
             qy = 1.0F;
         }
         int tint = inst.tint;
-        int r = (d.get(at + 12) & 255) * (tint >> 16 & 255) / 255, gg = (d.get(at + 13) & 255) * (tint >> 8 & 255) / 255;
-        int bb = (d.get(at + 14) & 255) * (tint & 255) / 255, a = (d.get(at + 15) & 255) * (tint >>> 24) / 255;
-        int emission = d.get(at + 28) & 255;
-        out.addVertex(px, py, pz, a << 24 | r << 16 | gg << 8 | bb, d.getFloat(at + 16), d.getFloat(at + 20),
+        int r = (MemoryUtil.memGetByte(at + 12) & 255) * (tint >> 16 & 255) / 255, gg = (MemoryUtil.memGetByte(at + 13) & 255) * (tint >> 8 & 255) / 255;
+        int bb = (MemoryUtil.memGetByte(at + 14) & 255) * (tint & 255) / 255, a = (MemoryUtil.memGetByte(at + 15) & 255) * (tint >>> 24) / 255;
+        int emission = MemoryUtil.memGetByte(at + 28) & 255;
+        out.addVertex(px, py, pz, a << 24 | r << 16 | gg << 8 | bb, MemoryUtil.memGetFloat(at + 16), MemoryUtil.memGetFloat(at + 20),
             net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, RemoteRenderer.withEmission(inst.light, emission), qx, qy, qz);
     }
 }

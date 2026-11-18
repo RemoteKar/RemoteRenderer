@@ -197,9 +197,14 @@ public final class RemoteRenderer {
      * nothing about those, so with a shader pack on everything goes the vanilla way (Iris then handles it).
      */
     private static boolean irisShaderPackInUse() {
+        return irisShaders;
+    }
+
+    /** Once a frame, before extraction (GameRenderer.extract): whether an Iris shader pack is in use. */
+    public static void refreshIris() {
         long now = System.nanoTime();
         if (now - irisCheckedAt < 250_000_000L) {
-            return irisShaders;
+            return;
         }
         irisCheckedAt = now;
         if (!irisLookedUp) {
@@ -226,7 +231,6 @@ public final class RemoteRenderer {
             MeshCache.requestClear();
         }
         irisShaders = inUse;
-        return inUse;
     }
 
     // ---------------------------------------------------------------- extract
@@ -269,7 +273,7 @@ public final class RemoteRenderer {
                 }
             }
         }
-        ItemModel model = currentModel(stack);
+        ItemModel model = cache.model(stack, MeshCache.generation);
         int gen = MeshCache.generation;
         boolean known = config.cacheResolve && cache.sameItem(stack, context, model, gen);
         MeshCache.StaticKey staticKey = null;
@@ -398,8 +402,8 @@ public final class RemoteRenderer {
         if (entry == null || entry.isRetired()) {
             return false;
         }
-        // as ItemDisplayRenderer.submitInner does before ItemStackRenderState.submit
-        poseStack.rotate(Axis.YP, (float) Math.PI);
+        // as ItemDisplayRenderer.submitInner does before ItemStackRenderState.submit (rotateY(180) = negating x and z)
+        halfTurn(poseStack);
         PoseStack.Pose pose = poseStack.last();
         // not with a pack's own item shader: such shaders may draw a display somewhere else than where it stands (a HUD
         // kept out of sight and moved onto the screen by item.vsh), and vanilla draws every display anyway
@@ -445,7 +449,7 @@ public final class RemoteRenderer {
         if (data == null) {
             return false;
         }
-        poseStack.rotate(Axis.YP, (float) Math.PI);
+        halfTurn(poseStack);
         for (MeshEntry.Part part : entry.parts) {
             collector.submitCustomGeometry(poseStack, part.renderType(), (pose, consumer) -> writeQuads(data, part, pose, consumer, lightCoords));
         }
@@ -466,18 +470,30 @@ public final class RemoteRenderer {
     private static void writeQuads(ByteBuffer d, MeshEntry.Part part, PoseStack.Pose pose, com.mojang.blaze3d.vertex.VertexConsumer out, int light) {
         org.joml.Matrix4f m = pose.pose();
         org.joml.Matrix3f n = pose.normal();
+        long base = org.lwjgl.system.MemoryUtil.memAddress(d, 0) + (long) part.firstVertex() * 32;
         for (int i = 0; i < part.quadCount() * 4; i++) {
-            int at = (part.firstVertex() + i) * 32;
-            m.transformPosition(d.getFloat(at), d.getFloat(at + 4), d.getFloat(at + 8), WRITE_P);
-            n.transform(d.get(at + 24) / 127.0F, d.get(at + 25) / 127.0F, d.get(at + 26) / 127.0F, WRITE_N);
+            long at = base + i * 32L;
+            m.transformPosition(org.lwjgl.system.MemoryUtil.memGetFloat(at), org.lwjgl.system.MemoryUtil.memGetFloat(at + 4),
+                org.lwjgl.system.MemoryUtil.memGetFloat(at + 8), WRITE_P);
+            n.transform(org.lwjgl.system.MemoryUtil.memGetByte(at + 24) / 127.0F, org.lwjgl.system.MemoryUtil.memGetByte(at + 25) / 127.0F,
+                org.lwjgl.system.MemoryUtil.memGetByte(at + 26) / 127.0F, WRITE_N);
             if (WRITE_N.lengthSquared() > 1.0e-12F) {
                 WRITE_N.normalize();
             }
-            int color = (d.get(at + 15) & 255) << 24 | (d.get(at + 12) & 255) << 16 | (d.get(at + 13) & 255) << 8 | d.get(at + 14) & 255;
-            out.addVertex(WRITE_P.x, WRITE_P.y, WRITE_P.z, color, d.getFloat(at + 16), d.getFloat(at + 20), OverlayTexture.NO_OVERLAY,
-                withEmission(light, d.get(at + 28) & 255), WRITE_N.x, WRITE_N.y, WRITE_N.z);
+            int rgba = org.lwjgl.system.MemoryUtil.memGetInt(at + 12);
+            // the bytes are r g b a in memory (little endian int: a b g r)
+            int color = (rgba >>> 24) << 24 | (rgba & 255) << 16 | (rgba >>> 8 & 255) << 8 | rgba >>> 16 & 255;
+            out.addVertex(WRITE_P.x, WRITE_P.y, WRITE_P.z, color, org.lwjgl.system.MemoryUtil.memGetFloat(at + 16), org.lwjgl.system.MemoryUtil.memGetFloat(at + 20),
+                OverlayTexture.NO_OVERLAY, withEmission(light, org.lwjgl.system.MemoryUtil.memGetByte(at + 28) & 255), WRITE_N.x, WRITE_N.y, WRITE_N.z);
         }
         STATS.frameQuads += part.quadCount();
+    }
+
+    /** poseStack.rotate(Axis.YP, PI) without the trigonometry and the full matrix product. */
+    private static void halfTurn(PoseStack poseStack) {
+        PoseStack.Pose p = poseStack.last();
+        p.pose().scale(-1.0F, 1.0F, -1.0F);
+        p.normal().scale(-1.0F, 1.0F, -1.0F);
     }
 
     private static final org.joml.Vector3f CULL_CENTER = new org.joml.Vector3f();
@@ -496,8 +512,10 @@ public final class RemoteRenderer {
         float s = r * (float) Math.sqrt(Math.max(pose.m00() * pose.m00() + pose.m01() * pose.m01() + pose.m02() * pose.m02(),
             Math.max(pose.m10() * pose.m10() + pose.m11() * pose.m11() + pose.m12() * pose.m12(), pose.m20() * pose.m20() + pose.m21() * pose.m21() + pose.m22() * pose.m22())));
         var cam = camera.position();
-        double x = CULL_CENTER.x + cam.x, y = CULL_CENTER.y + cam.y, z = CULL_CENTER.z + cam.z;
-        return !frustum.isVisible(new net.minecraft.world.phys.AABB(x - s, y - s, z - s, x + s, y + s, z + s));
+        // the frustum's planes are relative to the position it was prepared at (the camera's)
+        float x = (float) (CULL_CENTER.x + cam.x - frustum.getCamX()), y = (float) (CULL_CENTER.y + cam.y - frustum.getCamY());
+        float z = (float) (CULL_CENTER.z + cam.z - frustum.getCamZ());
+        return !((kr.gcb.remoterenderer.mixin.FrustumAccessor) frustum).remoterenderer$intersection().testSphere(x, y, z, s);
     }
 
     /** -Dremoterenderer.dump=<part of an item model id>: logs each such display's transformation and bounds once. */

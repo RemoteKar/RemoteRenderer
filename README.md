@@ -31,7 +31,7 @@ distinct model once into a GPU buffer and draws all displays of it with one inst
 - **With Iris shader packs** (`shaderCompat`, on by default):
   - the baked models and rigs are handed to vanilla render types, so the pack draws them with its own programs and shadows;
   - model resolution is still skipped, and rigs are skinned on the CPU;
-  - under Complementary Reimagined: a scene of rigs and BetterModel meshes 17 → 85 FPS; 36 very heavy mesh bones 7 → 14 FPS (the vertices are written on the CPU there, as vanilla does).
+  - under Complementary Reimagined: a scene of rigs and BetterModel meshes 17 → 85 FPS; 36 very heavy mesh bones 7 → 16 FPS (the vertices are written on the CPU there, as vanilla does).
 
 ## Commands (with Fabric API)
 
@@ -112,7 +112,7 @@ Under such packs, plain displays are not culled, because the shader may draw the
 |---|---:|---:|
 | 36 BetterModel mesh bones (2304 triangles each), OpenGL | 22 FPS | 1697 FPS |
 | same, Vulkan + Sodium etc. | 21 FPS | 3155 FPS |
-| ~2600 BetterModel cube-bone displays, OpenGL | 302 FPS | 603 FPS |
+| ~2600 BetterModel cube-bone displays, OpenGL | 307 FPS | 730 FPS |
 | 100 animated objmc models, Vulkan | 784 FPS* | 2923 FPS |
 | 24 heavy mesh bones appearing in the same tick: worst frame | 146–169 ms | 14.5–19.7 ms |
 
